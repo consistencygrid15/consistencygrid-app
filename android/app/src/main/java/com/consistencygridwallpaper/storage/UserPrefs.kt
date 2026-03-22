@@ -42,8 +42,6 @@ class UserPrefs(context: Context) {
         const val KEY_TOKEN_EXPIRY = "token_expiry_ms" // Unix timestamp in millis
         const val KEY_UPDATE_HOUR = "update_hour"
         const val KEY_UPDATE_MINUTE = "update_minute"
-        const val KEY_FCM_TOKEN = "fcm_token"
-        const val KEY_FCM_TOKEN_SYNCED = "fcm_token_synced"
         
         // Defaults
         private const val DEFAULT_THEME_COLOR = "#FF7A00" // Orange
@@ -357,27 +355,5 @@ class UserPrefs(context: Context) {
      */
     fun isOnboarded(): Boolean {
         return prefs.getBoolean(KEY_ONBOARDED, false)
-    }
-
-    /**
-     * Saves the FCM device token.
-     */
-    fun setFcmToken(token: String) {
-        prefs.edit().putString(KEY_FCM_TOKEN, token).apply()
-    }
-
-    fun getFcmToken(): String? {
-        return prefs.getString(KEY_FCM_TOKEN, null)
-    }
-
-    /**
-     * Marks whether the FCM token has been successfully synced to the backend.
-     */
-    fun setFcmTokenSynced(synced: Boolean) {
-        prefs.edit().putBoolean(KEY_FCM_TOKEN_SYNCED, synced).apply()
-    }
-
-    fun isFcmTokenSynced(): Boolean {
-        return prefs.getBoolean(KEY_FCM_TOKEN_SYNCED, false)
     }
 }

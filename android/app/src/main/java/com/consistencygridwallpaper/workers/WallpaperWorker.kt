@@ -46,7 +46,6 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
     companion object {
         const val TAG = "WallpaperWorker"
         private const val RENDER_TIMEOUT_MS = 90000L  // 90 seconds for WebView rendering
-        private const val MAX_JITTER_MS    = 5 * 60 * 1000L // 5 minutes max jitter
     }
 
     private val userPrefs = UserPrefs(context)
@@ -80,9 +79,7 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             return@withContext Result.failure()
         }
         
-        Log.d(TAG, "✅ Token retrieved, proceeding with update")
-
-        Log.d(TAG, "⚡ Executing API immediately (Push driven, No Jitter needed)")
+        Log.d(TAG, "✅ Token retrieved, proceeding with exact update")
 
         try {
             // Give rendering up to 90 seconds (+ jitter already waited above)
@@ -109,6 +106,9 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
             Log.e(TAG, "❌ Background update failed: ${e.message}", e)
             Result.retry()
         } finally {
+            // 🔓 CRITICAL: Always release the WakeLock acquired by the receiver!
+            // This prevents battery drain if the WorkManager finishes early.
+            com.consistencygridwallpaper.workers.MidnightReceiver.releaseWakeLock()
             Log.d(TAG, "🏁 Background worker finished/exited")
         }
     }

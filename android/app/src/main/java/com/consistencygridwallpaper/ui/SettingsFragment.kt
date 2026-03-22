@@ -55,12 +55,12 @@ class SettingsFragment : Fragment() {
     }
 
     private fun scheduleWork() {
-        com.consistencygridwallpaper.workers.WorkScheduler.scheduleDailyUpdate(requireContext())
-        Toast.makeText(context, "Daily Update Scheduled for 12 AM ✅", Toast.LENGTH_SHORT).show()
+        com.consistencygridwallpaper.workers.ExactAlarmScheduler.scheduleNextMidnightAlarm(requireContext())
+        Toast.makeText(context, "Exact Daily Update Scheduled for 12 AM ✅", Toast.LENGTH_SHORT).show()
     }
 
     private fun cancelWork() {
-        WorkManager.getInstance(requireContext()).cancelUniqueWork(com.consistencygridwallpaper.workers.WorkScheduler.TAG)
+        com.consistencygridwallpaper.workers.ExactAlarmScheduler.cancelMidnightAlarm(requireContext())
         Toast.makeText(context, "Daily Update Cancelled ❌", Toast.LENGTH_SHORT).show()
     }
 }

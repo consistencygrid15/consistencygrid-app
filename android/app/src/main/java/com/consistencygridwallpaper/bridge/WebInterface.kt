@@ -193,6 +193,10 @@ class WebInterface(private val context: Context) {
         }.start()
     }
 
+    /**
+     * Saves the user's authentication token to persistent storage.
+     * ... existing doc ...
+     */
     @JavascriptInterface
     fun saveToken(token: String) {
         Log.d(TAG, "saveToken: Saving authentication token")
@@ -205,19 +209,6 @@ class WebInterface(private val context: Context) {
             android.webkit.CookieManager.getInstance().flush()
             
             Log.d(TAG, "saveToken: Token saved and cookies flushed")
-            
-            // 🚀 Force FCM token sync after successful login
-            userPrefs.setFcmTokenSynced(false)
-            com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    val fcmToken = task.result
-                    userPrefs.setFcmToken(fcmToken)
-                    com.consistencygridwallpaper.utils.NetworkUtils.syncFcmToken(context, fcmToken)
-                    Log.d(TAG, "saveToken: Initiated FCM token sync to API")
-                } else {
-                    Log.w(TAG, "saveToken: Failed to fetch FCM token", task.exception)
-                }
-            }
         } catch (e: Exception) {
             Log.e(TAG, "saveToken: Failed to save token", e)
         }
@@ -320,10 +311,10 @@ class WebInterface(private val context: Context) {
             // Only show FEEDBACK if it was just turned ON
             val shouldShowFeedback = !previouslyEnabled
             
-            com.consistencygridwallpaper.workers.WorkScheduler.scheduleDailyUpdate(context, showFeedback = shouldShowFeedback)
+            com.consistencygridwallpaper.workers.ExactAlarmScheduler.scheduleNextMidnightAlarm(context)
             
             if (shouldShowFeedback) {
-                showToast("Daily 12 AM updates enabled! ⏰")
+                showToast("Exact Daily 12 AM updates enabled! ⏰")
                 Log.d(TAG, "setAutoUpdateEnabled: Daily updates scheduled with feedback")
                 
                 // Show verification dialog with testing instructions ONLY ONCE
@@ -337,7 +328,7 @@ class WebInterface(private val context: Context) {
                 Log.d(TAG, "setAutoUpdateEnabled: Daily updates re-scheduled silently")
             }
         } else {
-            com.consistencygridwallpaper.workers.WorkScheduler.cancelDailyUpdate(context)
+            com.consistencygridwallpaper.workers.ExactAlarmScheduler.cancelMidnightAlarm(context)
             if (previouslyEnabled) {
                 showToast("Daily updates disabled.")
             }
@@ -358,7 +349,8 @@ class WebInterface(private val context: Context) {
 
         // Reschedule the alarm if auto-update is currently enabled
         if (userPrefs.isAutoUpdateEnabled()) {
-            com.consistencygridwallpaper.workers.WorkScheduler.scheduleDailyUpdate(context, showFeedback = true)
+            com.consistencygridwallpaper.workers.ExactAlarmScheduler.scheduleNextMidnightAlarm(context)
+            showToast("Update time saved. Next alarm scheduled.")
         } else {
             showToast("Update time saved. Enable auto updates to apply.")
         }
@@ -572,7 +564,7 @@ class WebInterface(private val context: Context) {
                     Log.d(TAG, "logout: Auth data cleared")
                     
                     // 2. Cancel background work
-                    com.consistencygridwallpaper.workers.WorkScheduler.cancelDailyUpdate(context)
+                    com.consistencygridwallpaper.workers.ExactAlarmScheduler.cancelMidnightAlarm(context)
                     Log.d(TAG, "logout: Background work cancelled")
                     
                     // 3. Clear WebView Cookies for a fresh start

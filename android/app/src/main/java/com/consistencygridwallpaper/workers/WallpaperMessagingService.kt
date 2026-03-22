@@ -1,69 +1,102 @@
 package com.consistencygridwallpaper.workers
 
 import android.util.Log
-import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import com.consistencygridwallpaper.storage.UserPrefs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.util.TimeZone
 
-/**
- * WallpaperMessagingService
- * 
- * Handles incoming Firebase Cloud Messaging (FCM) silent push notifications.
- * Received from the Next.js server when a user's wallpaper is ready to be updated.
- */
 class WallpaperMessagingService : FirebaseMessagingService() {
 
     companion object {
-        private const val TAG = "WallpaperMsgService"
+        private const val TAG = "FCMService"
     }
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        Log.d(TAG, "🔄 New FCM Token generated: $token")
-        // Save token to SharedPreferences so MainActivity can send it to the server
-        val prefs = UserPrefs(applicationContext)
-        prefs.setFcmToken(token)
-        prefs.setFcmTokenSynced(false) // Mark it as needing sync to server
+        Log.d(TAG, "Refreshed token: $token")
+        sendRegistrationToServer(token)
     }
 
-    override fun onMessageReceived(message: RemoteMessage) {
-        super.onMessageReceived(message)
-        Log.d(TAG, "📥 FCM Message received from: ${message.from}")
+    private fun sendRegistrationToServer(token: String) {
+        // We need to send this to Next.js API
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Get the base token/session from userPrefs to authenticate the API call
+                val userPrefs = com.consistencygridwallpaper.storage.UserPrefs(applicationContext)
+                val userToken = userPrefs.getToken()
+                
+                if (userToken.isNullOrEmpty()) {
+                     Log.w(TAG, "No user token available to sync FCM token")
+                     return@launch
+                }
 
-        // Ensure user is logged in
-        val userPrefs = UserPrefs(applicationContext)
-        if (userPrefs.getToken().isNullOrBlank()) {
-            Log.w(TAG, "⚠️ No auth token found. Ignoring push update.")
-            return
+                val timezone = TimeZone.getDefault().id
+                val baseUrl = userPrefs.getBaseUrl()
+                val client = OkHttpClient()
+
+                val json = JSONObject().apply {
+                    put("token", token)
+                    put("timezone", timezone)
+                    put("deviceType", "android")
+                }
+
+                val body = json.toString().toRequestBody("application/json".toMediaType())
+                
+                // Add exact cookies required by getUniversalSession
+                val request = Request.Builder()
+                    .url("$baseUrl/api/device-token")
+                    .post(body)
+                    .addHeader("Cookie", "publicToken=$userToken; native_auth=true")
+                    .build()
+
+                val response = client.newCall(request).execute()
+                if (response.isSuccessful) {
+                    Log.d(TAG, "Successfully synced FCM token to server")
+                } else {
+                    Log.e(TAG, "Failed to sync FCM token: ${response.code}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error syncing FCM token", e)
+            }
         }
+    }
 
-        // Trigger immediate wallpaper update worker
-        // Using PUSH_UPDATE tag ensures 0 jitter (instant execution) in WallpaperWorker
-        Log.d(TAG, "🚀 Triggering background WorkManager for wallpaper update...")
-        
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
-            
-        val pushWorkRequest = OneTimeWorkRequestBuilder<WallpaperWorker>()
-            .addTag(WallpaperWorker.TAG)
-            .addTag("PUSH_UPDATE")
-            .setConstraints(constraints)
-            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-            .build()
+    override fun onMessageReceived(remoteMessage: RemoteMessage) {
+        Log.d(TAG, "From: ${remoteMessage.from}")
 
-        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-            "DAILY_WALLPAPER_UPDATE_PUSH",
-            ExistingWorkPolicy.REPLACE,
-            pushWorkRequest
-        )
-        
-        Log.d(TAG, "✅ Push-driven WallpaperWorker enqueued")
+        // Check if message contains a data payload.
+        if (remoteMessage.data.isNotEmpty()) {
+            Log.d(TAG, "Message data payload: ${remoteMessage.data}")
+
+            val type = remoteMessage.data["type"]
+            if (type == "WALLPAPER_UPDATE_TRIGGER") {
+                Log.d(TAG, "Received Wallpaper Update Trigger. Launching Worker...")
+                
+                val userPrefs = com.consistencygridwallpaper.storage.UserPrefs(applicationContext)
+                
+                // 🚀 Start WorkManager instantly using Expedited job to bypass App Standby Buckets & Doze mode
+                val workRequest = OneTimeWorkRequestBuilder<WallpaperWorker>()
+                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                    .build()
+
+                WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+                    "WallpaperUpdate_FCM",
+                    ExistingWorkPolicy.REPLACE,
+                    workRequest
+                )
+            }
+        }
     }
 }

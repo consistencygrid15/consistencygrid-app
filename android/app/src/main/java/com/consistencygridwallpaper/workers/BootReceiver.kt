@@ -26,9 +26,8 @@ class BootReceiver : BroadcastReceiver() {
             
             val userPrefs = UserPrefs(context)
             if (userPrefs.isAutoUpdateEnabled()) {
-                Log.d(TAG, "✅ Auto-update is enabled. Rescheduling alarm and checking for missed updates...")
-                WorkScheduler.scheduleDailyUpdate(context)
-                WorkScheduler.checkAndScheduleMissedUpdate(context)
+                Log.d(TAG, "✅ Auto-update is enabled. Rescheduling exact midnight alarm...")
+                ExactAlarmScheduler.scheduleNextMidnightAlarm(context)
             } else {
                 Log.d(TAG, "ℹ️ Auto-update disabled, skipping.")
             }

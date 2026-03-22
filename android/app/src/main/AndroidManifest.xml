@@ -54,14 +54,10 @@
             </intent-filter>
         </receiver>
 
-        <!-- 🚀 Firebase Cloud Messaging Service for Server-Driven Updates -->
-        <service
-            android:name=".workers.WallpaperMessagingService"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.google.firebase.MESSAGING_EVENT" />
-            </intent-filter>
-        </service>
+        <receiver
+            android:name=".workers.MidnightReceiver"
+            android:enabled="true"
+            android:exported="false" />
 
         <!-- 🔄 Required for WallpaperWorker.setForeground() to run as a Foreground Service -->
         <!-- Without this, WorkManager silently skips the foreground promotion on Android 12+ -->
@@ -70,7 +66,14 @@
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
 
-            
+        <!-- 📡 Firebase Cloud Messaging Service for Real-time Wallpaper Updates -->
+        <service
+            android:name=".workers.WallpaperMessagingService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <activity
             android:name=".MainActivity"

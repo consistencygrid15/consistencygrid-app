@@ -227,25 +227,35 @@ class MainActivity : AppCompatActivity() {
         val userPrefs = com.consistencygridwallpaper.storage.UserPrefs(this)
         applyTheme(userPrefs.getThemeColor(), userPrefs.isDarkMode())
 
-        // 8️⃣ Fetch and Sync Firebase Cloud Messaging Token
-        com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                Log.w(TAG, "Fetching FCM registration token failed", task.exception)
-                return@addOnCompleteListener
+        // 8️⃣ Ensure auto-update schedule (Force Enable & Check Permissions)
+        if (userPrefs.isAutoUpdateEnabled() || authManager.isLoggedIn()) {
+             // Force enable if logged in but currently disabled (migration fix)
+             if (!userPrefs.isAutoUpdateEnabled()) {
+                 Log.d(TAG, "🔧 Migrating legacy user: Force-enabling auto-update")
+                 userPrefs.setAutoUpdate(true)
+             }
+
+            Log.d(TAG, "Auto-update is enabled, ensuring schedule is active")
+            
+            // Check for Exact Alarm permission on Android 12+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val alarmManager = getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
+                if (!alarmManager.canScheduleExactAlarms()) {
+                    Log.w(TAG, "⚠️ Exact alarm permission missing! Prompting user...")
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                        data = android.net.Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                }
             }
 
-            val token = task.result
-            Log.d(TAG, "FCM Token: $token")
-            val prefs = com.consistencygridwallpaper.storage.UserPrefs(this@MainActivity)
-            
-            // If the token changed, mark it as unsynced
-            if (prefs.getFcmToken() != token) {
-                prefs.setFcmTokenSynced(false)
-            }
-            prefs.setFcmToken(token)
-            
-            // Attempt to send it to the Next.js server
-            com.consistencygridwallpaper.utils.NetworkUtils.syncFcmToken(this@MainActivity, token)
+            // 🔋 Request Battery Optimization Exemption
+            // Without this, B   attery Saver / Doze mode kills the WallpaperWorker before it can run.
+            // This shows a system dialog: "Allow app to run unrestricted in background?"
+            // It is now enforced via checkBatteryOptimizationExemption() in onResume()
+
+            // Schedule the exact exact midnight update
+            com.consistencygridwallpaper.workers.ExactAlarmScheduler.scheduleNextMidnightAlarm(this)
         }
 
 
