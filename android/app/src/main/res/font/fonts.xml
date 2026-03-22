@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Font files not included in build; using system defaults -->
+    <!-- <font name="roboto_regular" resourceId="@font/roboto_regular" /> -->
+    <!-- <font name="roboto_medium" resourceId="@font/roboto_medium" /> -->
+    <!-- <font name="roboto_bold" resourceId="@font/roboto_bold" /> -->
+</resources>

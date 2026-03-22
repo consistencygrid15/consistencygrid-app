@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "933386558979",
+    "project_id": "consistencygrid-9759c",
+    "storage_bucket": "consistencygrid-9759c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:933386558979:android:530a2c7fa3b1d0507ff836",
+        "android_client_info": {
+          "package_name": "com.consistencygridwallpaper"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBrcRNK_0rNZOJ-hyoCZf1tC1IBHKDbRSs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

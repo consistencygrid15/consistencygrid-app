@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/premium_bg">
+
+    <!-- Ambient Glow behind Logo -->
+    <View
+        android:id="@+id/ambient_glow"
+        android:layout_width="400dp"
+        android:layout_height="400dp"
+        android:background="@drawable/premium_glow"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottom_container"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:translationY="-50dp" />
+
+    <!-- Logo / Brand Container -->
+    <LinearLayout
+        android:id="@+id/logo_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottom_container"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:translationY="-30dp">
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            app:cardCornerRadius="24dp"
+            app:cardBackgroundColor="@color/premium_surface"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/premium_border"
+            app:cardElevation="12dp">
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/app_logo"
+                android:scaleType="centerCrop"
+                android:padding="0dp" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:id="@+id/tv_app_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ConsistencyGrid"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:letterSpacing="-0.02"
+            android:textColor="@color/premium_text_primary"
+            android:layout_marginTop="24dp" />
+
+        <TextView
+            android:id="@+id/tv_subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Master your habits. Own your time."
+            android:textSize="16sp"
+            android:textColor="@color/premium_text_secondary"
+            android:layout_marginTop="8dp" />
+    </LinearLayout>
+
+    <!-- Bottom Buttons Container -->
+    <LinearLayout
+        android:id="@+id/bottom_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="24dp"
+        android:paddingBottom="48dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Google Sign-In Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_google_signin"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Continue with Google"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/premium_google_text"
+            android:backgroundTint="@color/premium_google_bg"
+            app:cornerRadius="16dp"
+            app:elevation="4dp"
+            app:icon="@drawable/ic_google_logo"
+            app:iconGravity="textStart"
+            app:iconPadding="12dp"
+            app:iconTint="@null" />
+
+        <!-- Divider with Text -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginVertical="24dp">
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="@color/premium_border" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="OR"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="@color/premium_text_secondary"
+                android:paddingHorizontal="16dp"
+                android:letterSpacing="0.1" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1"
+                android:background="@color/premium_border" />
+        </LinearLayout>
+
+        <!-- Email Signup Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_email_signup"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Create Account with Email"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/premium_text_primary"
+            android:backgroundTint="@color/premium_email_btn"
+            app:cornerRadius="16dp"
+            app:elevation="0dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Email Login Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_email_login"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Sign In"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/premium_text_primary"
+            android:backgroundTint="@color/premium_surface"
+            app:cornerRadius="16dp"
+            app:strokeColor="@color/premium_border"
+            app:strokeWidth="1dp"
+            app:elevation="0dp" />
+
+    </LinearLayout>
+
+    <!-- Error Message -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/error_card"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:cardBackgroundColor="#2A1010"
+        app:cardCornerRadius="16dp"
+        app:strokeWidth="1dp"
+        app:strokeColor="#7F1D1D"
+        android:layout_marginHorizontal="24dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="48dp">
+        <TextView
+            android:id="@+id/tv_error"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FCA5A5"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:padding="16dp" />
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Loading Indicator -->
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:visibility="gone"
+        android:indeterminate="true"
+        android:indeterminateTint="@color/premium_email_btn"
+        android:translationZ="10dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

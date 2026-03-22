@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Material Design 3 Primary Colors -->
+    <color name="primary">#FF7A00</color>
+    <color name="primary_variant">#FF5C00</color>
+    <color name="on_primary">#FFFFFF</color>
+    
+    <!-- Secondary Colors -->
+    <color name="secondary">#00BCD4</color>
+    <color name="secondary_variant">#0097A7</color>
+    <color name="on_secondary">#FFFFFF</color>
+    
+    <!-- Tertiary Colors -->
+    <color name="tertiary">#9C27B0</color>
+    <color name="on_tertiary">#FFFFFF</color>
+    
+    <!-- Background & Surface -->
+    <color name="background">#FFFFFF</color>
+    <color name="surface">#F5F5F5</color>
+    <color name="surface_variant">#E8E8E8</color>
+    <color name="on_background">#1F1F1F</color>
+    <color name="on_surface">#1F1F1F</color>
+    
+    <!-- Error Colors -->
+    <color name="error">#B3261E</color>
+    <color name="error_container">#F9DEDC</color>
+    <color name="on_error">#FFFFFF</color>
+    
+    <!-- Utility Colors -->
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="gray_light">#F0F0F0</color>
+    <color name="gray_medium">#757575</color>
+    <color name="gray_dark">#424242</color>
+    
+    <!-- Status Colors -->
+    <color name="success">#4CAF50</color>
+    <color name="warning">#FFC107</color>
+    <color name="info">#2196F3</color>
+    
+    <!-- Splash Screen -->
+    <color name="splash_bg_white">#FFFFFF</color>
+
+    <!-- Premium Auth UI Colors -->
+    <color name="premium_bg">#09090b</color>
+    <color name="premium_surface">#18181b</color>
+    <color name="premium_surface_variant">#27272a</color>
+    <color name="premium_text_primary">#ffffff</color>
+    <color name="premium_text_secondary">#a1a1aa</color>
+    <color name="premium_border">#3f3f46</color>
+    <color name="premium_google_bg">#ffffff</color>
+    <color name="premium_google_text">#18181b</color>
+    <color name="premium_email_btn">#FF7A00</color>
+</resources>
