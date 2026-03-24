@@ -7,30 +7,39 @@ import android.util.Log
 import com.consistencygridwallpaper.storage.UserPrefs
 
 /**
- * BootReceiver - Restores Alarms on Device Restart
+ * BootReceiver — Restores alarms on device restart or APK update.
  *
- * Triggered when the device finishes booting (RECEIVE_BOOT_COMPLETED).
- * Responsibilities:
- * 1. Check if the user has enabled auto-updates
- * 2. If enabled, re-schedule the daily update alarm (since alarms are cleared on reboot)
+ * Handles:
+ * - BOOT_COMPLETED: device rebooted (alarms are cleared on reboot)
+ * - MY_PACKAGE_REPLACED: app was updated (alarms are also cleared by the system
+ *   when the APK is replaced, so we must reschedule here too)
  */
 class BootReceiver : BroadcastReceiver() {
-    
+
     companion object {
         private const val TAG = "BootReceiver"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            Log.d(TAG, "📱 Device boot completed. Checking auto-update preference...")
-            
-            val userPrefs = UserPrefs(context)
-            if (userPrefs.isAutoUpdateEnabled()) {
-                Log.d(TAG, "✅ Auto-update is enabled. Rescheduling exact midnight alarm...")
-                ExactAlarmScheduler.scheduleNextMidnightAlarm(context)
-            } else {
-                Log.d(TAG, "ℹ️ Auto-update disabled, skipping.")
+        when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED -> {
+                Log.d(TAG, "📱 Device boot completed. Checking auto-update preference...")
+                rescheduleIfEnabled(context)
             }
+            Intent.ACTION_MY_PACKAGE_REPLACED -> {
+                Log.d(TAG, "📦 MY_PACKAGE_REPLACED received. Rescheduling alarm after APK update...")
+                rescheduleIfEnabled(context)
+            }
+        }
+    }
+
+    private fun rescheduleIfEnabled(context: Context) {
+        val userPrefs = UserPrefs(context)
+        if (userPrefs.isAutoUpdateEnabled()) {
+            Log.d(TAG, "✅ Auto-update is enabled. Rescheduling exact midnight alarm...")
+            ExactAlarmScheduler.scheduleNextMidnightAlarm(context)
+        } else {
+            Log.d(TAG, "ℹ️ Auto-update disabled, skipping reschedule.")
         }
     }
 }

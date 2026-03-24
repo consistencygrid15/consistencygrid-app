@@ -36,6 +36,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import java.io.ByteArrayOutputStream
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * MainActivity - Full-Screen WebView Wrapper for ConsistencyGrid
@@ -272,6 +274,9 @@ class MainActivity : AppCompatActivity() {
 
         // 🔟 Handle Deep Links (Payment Success)
         handleDeepLink(intent)
+
+        // 1️⃣1️⃣ Initialize Firebase and Fetch FCM Token
+        initFirebaseAndSendToken()
     }
 
     override fun onNewIntent(intent: android.content.Intent?) {
@@ -1176,5 +1181,65 @@ class MainActivity : AppCompatActivity() {
         Log.d(TAG, "onDestroy: Performing final cleanup")
         // Final flush on app close
         CookieManager.getInstance().flush()
+    }
+
+    /**
+     * Initializes Firebase explicitly and sends the FCM token + timezone to the backend.
+     */
+    private fun initFirebaseAndSendToken() {
+        try {
+            com.google.firebase.FirebaseApp.initializeApp(this)
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (!task.isSuccessful) {
+                    Log.w(TAG, "Fetching FCM registration token failed", task.exception)
+                    return@addOnCompleteListener
+                }
+
+                val token = task.result
+                Log.d(TAG, "FCM Token fetched in MainActivity: $token")
+                
+                // Send to backend
+                lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    try {
+                        val userPrefs = com.consistencygridwallpaper.storage.UserPrefs(this@MainActivity)
+                        val userToken = userPrefs.getToken()
+                        
+                        if (userToken.isNullOrEmpty()) {
+                            Log.w(TAG, "No user token available to sync FCM token")
+                            return@launch
+                        }
+
+                        val timezone = java.util.TimeZone.getDefault().id
+                        val baseUrl = userPrefs.getBaseUrl()
+                        val client = okhttp3.OkHttpClient()
+
+                        val json = org.json.JSONObject().apply {
+                            put("token", token)
+                            put("timezone", timezone)
+                            put("deviceType", "android")
+                        }
+
+                        val body = json.toString().toRequestBody("application/json".toMediaType())
+                        
+                        val request = okhttp3.Request.Builder()
+                            .url("$baseUrl/api/device-token")
+                            .post(body)
+                            .addHeader("Cookie", "publicToken=$userToken; native_auth=true")
+                            .build()
+
+                        val response = client.newCall(request).execute()
+                        if (response.isSuccessful) {
+                            Log.d(TAG, "Successfully synced FCM token to server from MainActivity")
+                        } else {
+                            Log.e(TAG, "Failed to sync FCM token from MainActivity: ${response.code}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error syncing FCM token from MainActivity", e)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing Firebase", e)
+        }
     }
 }

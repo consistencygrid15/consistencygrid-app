@@ -208,7 +208,7 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            cacheMode = WebSettings.LOAD_NO_CACHE
+            cacheMode = WebSettings.LOAD_DEFAULT
             userAgentString = "ConsistencyGridApp/1.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36"
             // Allow mixed content (http+https) needed for some CDN assets
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE

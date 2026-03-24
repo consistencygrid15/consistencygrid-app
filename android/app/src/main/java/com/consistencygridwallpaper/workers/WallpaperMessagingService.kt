@@ -92,8 +92,8 @@ class WallpaperMessagingService : FirebaseMessagingService() {
                     .build()
 
                 WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-                    "WallpaperUpdate_FCM",
-                    ExistingWorkPolicy.REPLACE,
+                    "WallpaperUpdate_Daily",   // Same name as MidnightReceiver — KEEP prevents duplicate renders
+                    ExistingWorkPolicy.KEEP,
                     workRequest
                 )
             }

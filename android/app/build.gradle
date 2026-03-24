@@ -1,5 +1,6 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.google.gms.google-services"
 
 android {
     namespace "com.consistencygridwallpaper"
@@ -83,8 +84,7 @@ dependencies {
     implementation "com.google.android.gms:play-services-auth:20.7.0"
 
     // Firebase Cloud Messaging (For exact immediate updates)
-    implementation platform('com.google.firebase:firebase-bom:33.1.2')
-    implementation 'com.google.firebase:firebase-messaging'
+    implementation 'com.google.firebase:firebase-messaging:23.4.0'
 
     // Storage Security (EncryptedSharedPreferences)
     implementation "androidx.security:security-crypto:1.1.0-alpha06"
