@@ -602,4 +602,44 @@ class WebInterface(private val context: Context) {
             Log.e(TAG, "requestLocationPermission: Context is not MainActivity")
         }
     }
+
+    /**
+     * Force-triggers a wallpaper update immediately, bypassing the daily duplicate guard.
+     * Callable from JavaScript console: Android.forceUpdateWallpaper()
+     * Used for testing without waiting for midnight.
+     */
+    @JavascriptInterface
+    fun forceUpdateWallpaper() {
+        Log.d(TAG, "forceUpdateWallpaper: 🧪 Force update triggered from JS bridge")
+        try {
+            val workRequest = androidx.work.OneTimeWorkRequestBuilder<com.consistencygridwallpaper.workers.WallpaperWorker>()
+                .addTag("FORCE_TEST_UPDATE")
+                .setExpedited(androidx.work.OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                .setInputData(
+                    androidx.work.Data.Builder()
+                        .putString("TRIGGER", "FORCE_TEST")
+                        .putBoolean("FORCE_UPDATE", true)
+                        .build()
+                )
+                .build()
+
+            // Cancel any stuck daily job first, then replace with a fresh one
+            val wm = androidx.work.WorkManager.getInstance(context)
+            wm.cancelUniqueWork("WallpaperUpdate_Daily")
+            wm.enqueueUniqueWork(
+                "WallpaperUpdate_Daily",
+                androidx.work.ExistingWorkPolicy.REPLACE,
+                workRequest
+            )
+
+            Log.d(TAG, "forceUpdateWallpaper: ✅ WallpaperWorker enqueued with FORCE_UPDATE=true")
+            if (context is MainActivity) {
+                (context as MainActivity).runOnUiThread {
+                    android.widget.Toast.makeText(context, "Wallpaper update triggered! Check in ~30s 🎨", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "forceUpdateWallpaper: ❌ Failed", e)
+        }
+    }
 }

@@ -16,6 +16,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.TimeZone
+import java.util.concurrent.TimeUnit
 
 class WallpaperMessagingService : FirebaseMessagingService() {
 
@@ -74,28 +75,55 @@ class WallpaperMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
-        Log.d(TAG, "From: ${remoteMessage.from}")
+        val receivedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+            .format(java.util.Date())
+        Log.d(TAG, "[TRIGGER=FCM] 📩 Message received at $receivedAt from: ${remoteMessage.from}")
 
         // Check if message contains a data payload.
         if (remoteMessage.data.isNotEmpty()) {
-            Log.d(TAG, "Message data payload: ${remoteMessage.data}")
+            Log.d(TAG, "[TRIGGER=FCM] Data payload: ${remoteMessage.data}")
 
             val type = remoteMessage.data["type"]
             if (type == "WALLPAPER_UPDATE_TRIGGER") {
-                Log.d(TAG, "Received Wallpaper Update Trigger. Launching Worker...")
-                
-                val userPrefs = com.consistencygridwallpaper.storage.UserPrefs(applicationContext)
-                
-                // 🚀 Start WorkManager instantly using Expedited job to bypass App Standby Buckets & Doze mode
+                Log.d(TAG, "[TRIGGER=FCM] Wallpaper update requested — preparing worker...")
+
+                // ── Fix 3.1: Acquire WakeLock ──────────────────────────────────────
+                // Without this, the CPU can sleep between onMessageReceived() returning
+                // and WorkManager actually starting the coroutine in Doze mode.
+                // MidnightReceiver.acquireWakeLock() is idempotent and will be released
+                // by WallpaperWorker.doWork() in its finally block.
+                MidnightReceiver.acquireWakeLock(applicationContext)
+                Log.d(TAG, "[TRIGGER=FCM] 🔒 WakeLock acquired")
+
+                // ── Fix 3.2: Always reschedule next alarm ──────────────────────────
+                // If FCM is the sole executor tonight (e.g. alarm was cancelled/revoked),
+                // the alarm chain must still be restored for tomorrow.
+                Log.d(TAG, "[TRIGGER=FCM] Rescheduling next alarm to ensure chain continuity...")
+                ExactAlarmScheduler.scheduleNextMidnightAlarm(applicationContext)
+
+                // ── Fix 3.3: Enqueue worker with TRIGGER tag ───────────────────────
+                // Duplicate-run guard is inside WallpaperWorker.doWork() — it will skip
+                // gracefully if today's update already happened.
                 val workRequest = OneTimeWorkRequestBuilder<WallpaperWorker>()
+                    .setInputData(
+                        androidx.work.Data.Builder()
+                            .putString("TRIGGER", "FCM")
+                            .build()
+                    )
                     .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                    .setBackoffCriteria(
+                        androidx.work.BackoffPolicy.EXPONENTIAL,
+                        10, // 10 minutes initial, then 20, 40
+                        TimeUnit.MINUTES
+                    )
                     .build()
 
                 WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-                    "WallpaperUpdate_Daily",   // Same name as MidnightReceiver — KEEP prevents duplicate renders
+                    "WallpaperUpdate_Daily",
                     ExistingWorkPolicy.KEEP,
                     workRequest
                 )
+                Log.d(TAG, "[TRIGGER=FCM] 🚀 WallpaperWorker enqueued (KEEP policy)")
             }
         }
     }

@@ -16,6 +16,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.resume
 
 /**
@@ -61,55 +68,135 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
         return createForegroundInfo("Updating wallpaper...")
     }
 
+    /**
+     * Sends analytics telemetry indicating the status of a scheduled wallpaper update.
+     */
+    private suspend fun sendAnalytics(token: String, status: String, trigger: String) {
+        withContext(Dispatchers.IO) {
+            try {
+                val baseUrl = userPrefs.getBaseUrl()
+                val client = OkHttpClient()
+                val json = JSONObject().apply {
+                    put("status", status)
+                    put("trigger", trigger)
+                    put("timestamp", java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).apply { 
+                        timeZone = java.util.TimeZone.getTimeZone("UTC") 
+                    }.format(java.util.Date()))
+                }
+                val body = json.toString().toRequestBody("application/json".toMediaType())
+                val request = Request.Builder()
+                    .url("$baseUrl/api/telemetry/wallpaper-update")
+                    .post(body)
+                    .addHeader("Cookie", "publicToken=$token; native_auth=true")
+                    .build()
+                val response = client.newCall(request).execute()
+                Log.d(TAG, "[TRIGGER=$trigger] 📊 Analytics sent: $status (HTTP ${response.code})")
+            } catch (e: Exception) {
+                Log.e(TAG, "[TRIGGER=$trigger] ⚠️ Failed to send analytics", e)
+            }
+        }
+    }
+
     override suspend fun doWork(): Result = withContext(Dispatchers.Main) {
-        Log.d(TAG, "🚀 Starting background wallpaper update...")
-        
-        // 🚨 CRITICAL: Promote to Foreground Service to prevent WebView killing
+        // Read which path triggered this worker (ALARM / FCM / BOOT / UNKNOWN)
+        val trigger = inputData.getString("TRIGGER") ?: "UNKNOWN"
+        val startedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+            .format(java.util.Date())
+        Log.d(TAG, "[TRIGGER=$trigger] 🚀 Worker started at $startedAt")
+
+        // ─────────────────────────────────────────────────────────────────
+        // Authoritative duplicate-run guard (single source of truth)
+        //
+        // This guard is the ONLY place that checks whether today's wallpaper
+        // has already been applied. It was moved here from MidnightReceiver
+        // because the old guard caused the alarm to be silently skipped every
+        // night after FCM ran first and marked lastUpdateDate for the same day.
+        //
+        // WorkManager KEEP policy prevents two workers from running in parallel.
+        // This guard prevents a second sequential worker from re-rendering.
+        // ─────────────────────────────────────────────────────────────────
+        val forceUpdate = inputData.getBoolean("FORCE_UPDATE", false)
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        val todayDate = sdf.format(java.util.Date())
+        val lastUpdateDate = userPrefs.getLastUpdateDate()
+        Log.d(TAG, "[TRIGGER=$trigger] Guard check: lastUpdateDate=$lastUpdateDate, todayDate=$todayDate, forceUpdate=$forceUpdate")
+        if (!forceUpdate && lastUpdateDate == todayDate) {
+            Log.d(TAG, "[TRIGGER=$trigger] ⚠️ Already updated today ($todayDate) — skipping render")
+            return@withContext Result.success()
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        // Crash-Safe Recovery Guard
+        // ─────────────────────────────────────────────────────────────────
+        if (userPrefs.isUpdateInProgress()) {
+            Log.w(TAG, "[TRIGGER=$trigger] ⚠️ Previous update crashed mid-execution. Retrying now.")
+            // Don't abort, just log it so we know we're recovering
+        }
+        userPrefs.setUpdateInProgress(true)
+
+        // 🚨 Promote to Foreground Service to keep the process alive during WebView rendering
         try {
             setForeground(createForegroundInfo("Updating wallpaper..."))
-            Log.d(TAG, "✅ Promoted to Foreground Service")
+            Log.d(TAG, "[TRIGGER=$trigger] ✅ Promoted to Foreground Service")
         } catch (e: Exception) {
-            Log.e(TAG, "⚠️ Failed to promote to foreground service", e)
-            // Continue anyway, but risks being killed
+            Log.e(TAG, "[TRIGGER=$trigger] ⚠️ Failed to promote to foreground service — continuing anyway", e)
         }
-        
+
         val token = userPrefs.getToken()
         if (token.isNullOrBlank()) {
-            Log.e(TAG, "❌ Error: Authentication token is null or empty!")
+            Log.e(TAG, "[TRIGGER=$trigger] ❌ Authentication token is null or empty!")
             return@withContext Result.failure()
         }
-        
-        Log.d(TAG, "✅ Token retrieved, proceeding with exact update")
+        Log.d(TAG, "[TRIGGER=$trigger] ✅ Token retrieved, proceeding with wallpaper render")
+
+        // ─────────────────────────────────────────────────────────────────
+        // Offline Fallback
+        // ─────────────────────────────────────────────────────────────────
+        if (!com.consistencygridwallpaper.utils.NetworkUtils.isNetworkAvailable(applicationContext)) {
+            Log.w(TAG, "[TRIGGER=$trigger] 📡 No internet — will retry later when network is available")
+            // Do NOT apply offline fallback and do NOT mark today as updated.
+            // Marking the day as updated here would block the real render when
+            // the network is restored, causing the user to see a stale wallpaper all day.
+            // WorkManager will retry this job when network conditions improve.
+            return@withContext Result.retry()
+        }
 
         try {
-            // Give rendering up to 90 seconds (+ jitter already waited above)
             val success = withTimeout(RENDER_TIMEOUT_MS) {
-                updateWallpaper(token)
+                updateWallpaper(token, trigger)
             }
-            
+
             if (success) {
-                // 🎉 Only mark the date as updated AFTER successful wallpaper application
-                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-                val todayDate = sdf.format(java.util.Date())
+                // Mark as updated ONLY after successful wallpaper application
                 userPrefs.setLastUpdateDate(todayDate)
-                Log.d(TAG, "📅 Marked today ($todayDate) as successfully updated")
-                Log.d(TAG, "✅ Background update completed successfully")
+                val completedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                    .format(java.util.Date())
+                Log.d(TAG, "[TRIGGER=$trigger] 📅 Marked $todayDate as updated at $completedAt")
+                Log.d(TAG, "[TRIGGER=$trigger] ✅ Wallpaper update completed successfully")
+                sendAnalytics(token, "SUCCESS", trigger)
                 Result.success()
             } else {
-                Log.w(TAG, "⚠️ Wallpaper render returned failure (e.g. empty base64 or bitmap decode failed)")
+                Log.w(TAG, "[TRIGGER=$trigger] ⚠️ Render returned failure (empty base64 or bitmap decode failed) — will retry")
+                sendAnalytics(token, "FAILED", trigger)
                 Result.retry()
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            Log.e(TAG, "❌ Background update timed out after ${RENDER_TIMEOUT_MS}ms", e)
+            Log.e(TAG, "[TRIGGER=$trigger] ❌ Timed out after ${RENDER_TIMEOUT_MS}ms — will retry", e)
+            sendAnalytics(token, "FAILED_TIMEOUT", trigger)
             Result.retry()
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Background update failed: ${e.message}", e)
+            Log.e(TAG, "[TRIGGER=$trigger] ❌ Failed: ${e.message} — will retry", e)
+            sendAnalytics(token, "FAILED_EXCEPTION", trigger)
             Result.retry()
         } finally {
-            // 🔓 CRITICAL: Always release the WakeLock acquired by the receiver!
-            // This prevents battery drain if the WorkManager finishes early.
+            userPrefs.setUpdateInProgress(false)
+            // Always release the WakeLock whether success, failure, or timeout.
+            // Safe to call even if FCM (not Alarm) was the trigger and the lock
+            // was acquired by WallpaperMessagingService.
             com.consistencygridwallpaper.workers.MidnightReceiver.releaseWakeLock()
-            Log.d(TAG, "🏁 Background worker finished/exited")
+            val exitedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                .format(java.util.Date())
+            Log.d(TAG, "[TRIGGER=$trigger] 🏁 Worker finished at $exitedAt")
         }
     }
 
@@ -156,20 +243,12 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
      *
      * Returns true if wallpaper was applied successfully, false otherwise.
      *
-     * This method:
-     * 1. Creates a headless WebView with JavaScript enabled
-     * 2. Adds a JavaScript bridge for the web app to call back with the rendered image
-     * 3. Loads the wallpaper renderer URL with token and screen dimensions
-     * 4. Waits for the web app to call saveWallpaper() with the base64-encoded image
-     * 5. Decodes and applies the wallpaper to the appropriate screen(s)
-     *
-     * The coroutine suspends until the JavaScript callback is received or timeout occurs.
-     *
-     * @param token The user's authentication token for fetching wallpaper data
+     * @param token   The user's authentication token for fetching wallpaper data
+     * @param trigger Who triggered this render: "ALARM", "FCM", "BOOT", or "UNKNOWN"
      * @return true if wallpaper applied successfully, false otherwise
      */
-    private suspend fun updateWallpaper(token: String): Boolean = suspendCancellableCoroutine { continuation ->
-        Log.d(TAG, "🌐 Loading wallpaper renderer...")
+    private suspend fun updateWallpaper(token: String, trigger: String = "UNKNOWN"): Boolean = suspendCancellableCoroutine { continuation ->
+        Log.d(TAG, "[TRIGGER=$trigger] 🌐 Loading wallpaper renderer...")
         val baseUrl = userPrefs.getBaseUrl()
         
         // Detect physical screen dimensions for perfect scaling in background
@@ -179,10 +258,15 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
         
         Log.d(TAG, "📱 Screen dimensions: ${width}x${height}")
         
-        // Append dimensions and timestamp (cache-busting) to URL
-        val timestamp = System.currentTimeMillis()
-        val url = "$baseUrl/wallpaper-renderer?token=$token&canvasWidth=$width&canvasHeight=$height&t=$timestamp"
-        Log.d(TAG, "🔗 Loading URL: $url")
+        // Bust cache once per calendar day using the DEVICE's local date,
+        // and pass the device timezone so the server uses the correct date.
+        val deviceTz = java.util.TimeZone.getDefault()
+        val localSdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        localSdf.timeZone = deviceTz
+        val localDate = localSdf.format(java.util.Date())
+        val tzId = java.net.URLEncoder.encode(deviceTz.id, "UTF-8")
+        val url = "$baseUrl/wallpaper-renderer?token=$token&canvasWidth=$width&canvasHeight=$height&date=$localDate&tz=$tzId"
+        Log.d(TAG, "🔗 Loading URL: $url (device tz=${deviceTz.id}, localDate=$localDate)")
         
         val webView = WebView(applicationContext)
         
@@ -208,7 +292,7 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
-            cacheMode = WebSettings.LOAD_DEFAULT
+            cacheMode = WebSettings.LOAD_NO_CACHE  // headless renderer MUST get fresh data
             userAgentString = "ConsistencyGridApp/1.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36"
             // Allow mixed content (http+https) needed for some CDN assets
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
@@ -354,5 +438,96 @@ class WallpaperWorker(context: Context, params: WorkerParameters) : CoroutineWor
         
         // Load the wallpaper renderer
         webView.loadUrl(url)
+    }
+
+    /**
+     * Applies a locally generated fallback wallpaper when the device is offline.
+     * Generates a basic dark gradient with a subtle grid pattern to maintain
+     * the app's aesthetic without requiring a network request.
+     *
+     * @return true if applied successfully, false otherwise
+     */
+    private suspend fun applyOfflineFallbackWallpaper(): Boolean = withContext(Dispatchers.Default) {
+        try {
+            val result = kotlinx.coroutines.withTimeoutOrNull(5000L) {
+                Log.d(TAG, "⚙️ Applying offline fallback wallpaper...")
+                val context = applicationContext
+                val metrics = context.resources.displayMetrics
+                val width = metrics.widthPixels
+                val height = metrics.heightPixels
+
+                val cacheFile = java.io.File(context.cacheDir, "fallback_wallpaper_cache.png")
+                val bitmap: android.graphics.Bitmap
+
+                if (cacheFile.exists()) {
+                    Log.d(TAG, "⚙️ Loading offline fallback from cache")
+                    bitmap = android.graphics.BitmapFactory.decodeFile(cacheFile.absolutePath)
+                        ?: throw Exception("Failed to decode cached fallback bitmap")
+                } else {
+                    Log.d(TAG, "⚙️ Generating new offline fallback wallpaper")
+                    bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(bitmap)
+
+                    // 1. Draw flat dark background (faster than LinearGradient on low-end devices)
+                    val paint = android.graphics.Paint()
+                    paint.color = android.graphics.Color.parseColor("#121212")
+                    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+
+                    // 2. Draw subtle grid lines minimally
+                    paint.color = android.graphics.Color.parseColor("#1AFFFFFF") // 10% white
+                    paint.strokeWidth = 2f
+                    
+                    val gridSize = width / 10f
+                    for (i in 0..10) {
+                        val x = i * gridSize
+                        canvas.drawLine(x, 0f, x, height.toFloat(), paint)
+                    }
+                    val numRows = (height / gridSize).toInt() + 1
+                    for (i in 0..numRows) {
+                        val y = i * gridSize
+                        canvas.drawLine(0f, y, width.toFloat(), y, paint)
+                    }
+
+                    // 3. Draw fallback text
+                    paint.color = android.graphics.Color.parseColor("#4DFFFFFF") // 30% white
+                    paint.textSize = width / 20f
+                    paint.textAlign = android.graphics.Paint.Align.CENTER
+                    paint.isAntiAlias = true
+                    canvas.drawText("CONSISTENCY GRID • OFFLINE", width / 2f, height - (height / 10f), paint)
+
+                    // Store to cache for future daily fallback usage
+                    java.io.FileOutputStream(cacheFile).use { out ->
+                        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                    }
+                }
+
+                // Apply the generated bitmap
+                val wallpaperManager = WallpaperManager.getInstance(context)
+                val target = userPrefs.getWallpaperTarget().trim().uppercase()
+
+                when (target) {
+                    "HOME" -> wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_SYSTEM)
+                    "LOCK" -> wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_LOCK)
+                    else -> {
+                        wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_SYSTEM)
+                        wallpaperManager.setBitmap(bitmap, null, true, WallpaperManager.FLAG_LOCK)
+                    }
+                }
+
+                bitmap.recycle()
+                Log.d(TAG, "✅ Offline fallback wallpaper applied successfully")
+                true
+            }
+            
+            if (result == null) {
+                Log.e(TAG, "❌ Offline fallback wallpaper generation timed out after 5s")
+                return@withContext false
+            } else {
+                return@withContext result
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to apply offline fallback wallpaper", e)
+            return@withContext false
+        }
     }
 }

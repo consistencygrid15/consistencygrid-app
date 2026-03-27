@@ -62,7 +62,7 @@ object ExactAlarmScheduler {
         val firedHH = firedAt.get(Calendar.HOUR_OF_DAY).toString().padStart(2, '0')
         val firedMM = firedAt.get(Calendar.MINUTE).toString().padStart(2, '0')
         val jitterMin = (jitterMs / 1000 / 60).toInt()
-        Log.d(TAG, "Scheduling alarm for ${firedHH}:${firedMM} (jitter=${jitterMin}min, base=${updateHour}:${updateMinute.toString().padStart(2,'0')})")
+        Log.d(TAG, "Scheduling alarm for ${firedHH}:${firedMM} (jitter=${jitterMin}min, base=${updateHour}:${updateMinute.toString().padStart(2,'0')})") 
 
         val intent = Intent(context, MidnightReceiver::class.java)
         val pendingIntent = PendingIntent.getBroadcast(

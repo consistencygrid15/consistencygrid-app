@@ -69,7 +69,7 @@
         <receiver
             android:name=".workers.MidnightReceiver"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="true" />
 
         <!-- 🔄 Required for WallpaperWorker.setForeground() to run as a Foreground Service -->
         <!-- Without this, WorkManager silently skips the foreground promotion on Android 12+ -->

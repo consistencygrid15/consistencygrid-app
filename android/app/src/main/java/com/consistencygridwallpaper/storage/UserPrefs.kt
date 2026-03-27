@@ -42,6 +42,7 @@ class UserPrefs(context: Context) {
         const val KEY_TOKEN_EXPIRY = "token_expiry_ms" // Unix timestamp in millis
         const val KEY_UPDATE_HOUR = "update_hour"
         const val KEY_UPDATE_MINUTE = "update_minute"
+        const val KEY_UPDATE_IN_PROGRESS = "update_in_progress"
         
         // Defaults
         private const val DEFAULT_THEME_COLOR = "#FF7A00" // Orange
@@ -355,5 +356,20 @@ class UserPrefs(context: Context) {
      */
     fun isOnboarded(): Boolean {
         return prefs.getBoolean(KEY_ONBOARDED, false)
+    }
+
+    /**
+     * Marks whether a wallpaper update is currently running.
+     * Used for crash-safe recovery.
+     */
+    fun setUpdateInProgress(inProgress: Boolean) {
+        prefs.edit().putBoolean(KEY_UPDATE_IN_PROGRESS, inProgress).apply()
+    }
+
+    /**
+     * Checks if a wallpaper update crashed mid-execution.
+     */
+    fun isUpdateInProgress(): Boolean {
+        return prefs.getBoolean(KEY_UPDATE_IN_PROGRESS, false)
     }
 }

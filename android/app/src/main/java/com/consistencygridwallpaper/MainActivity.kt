@@ -468,6 +468,12 @@ class MainActivity : AppCompatActivity() {
     private fun setupWebView() {
         Log.d(TAG, "setupWebView: Configuring WebView settings")
         
+        // Enable Chrome DevTools inspection for debugging (debug builds only)
+        if (BuildConfig.DEBUG) {
+            WebView.setWebContentsDebuggingEnabled(true)
+            Log.d(TAG, "setupWebView: WebContentsDebugging enabled for debug build")
+        }
+        
         // Initialize CookieManager with aggressive persistence
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
@@ -497,8 +503,8 @@ class MainActivity : AppCompatActivity() {
             // UI & Scaling
             useWideViewPort = true
             loadWithOverviewMode = true
-            setSupportZoom(true)
-            builtInZoomControls = true
+            setSupportZoom(false)
+            builtInZoomControls = false
             displayZoomControls = false
             
             // Mixed Content: Compatibility mode allows some mixed content
