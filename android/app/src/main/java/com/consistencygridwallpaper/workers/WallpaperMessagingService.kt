@@ -101,12 +101,7 @@ class WallpaperMessagingService : FirebaseMessagingService() {
                 Log.d(TAG, "[TRIGGER=FCM] Rescheduling next alarm to ensure chain continuity...")
                 ExactAlarmScheduler.scheduleNextMidnightAlarm(applicationContext)
 
-                // ── Fix 3.3: Enqueue worker with RANDOM JITTER ────────────────────
-                // Server sends "jitter_max_minutes" (e.g. 60). We delay rendering
-                // randomly within this window so 100k users don't hit the server at once.
-                val maxJitterMinutes = remoteMessage.data["jitter_max_minutes"]?.toLongOrNull() ?: 30L
-                val randomDelaySeconds = kotlin.random.Random.nextLong(0, maxJitterMinutes * 60)
-                Log.d(TAG, "[TRIGGER=FCM] 🎲 Adding random jitter delay: $randomDelaySeconds seconds")
+                Log.d(TAG, "[TRIGGER=FCM] 🚀 Removing client-side jitter delay to bypass Doze authentically")
 
                 val workRequest = OneTimeWorkRequestBuilder<WallpaperWorker>()
                     .setInputData(
@@ -114,7 +109,7 @@ class WallpaperMessagingService : FirebaseMessagingService() {
                             .putString("TRIGGER", "FCM")
                             .build()
                     )
-                    .setInitialDelay(randomDelaySeconds, TimeUnit.SECONDS)
+                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                     .setBackoffCriteria(
                         androidx.work.BackoffPolicy.EXPONENTIAL,
                         10, // 10 minutes initial, then 20, 40
@@ -123,11 +118,11 @@ class WallpaperMessagingService : FirebaseMessagingService() {
                     .build()
 
                 WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-                    "WallpaperUpdate_Daily",
+                    "WallpaperUpdate_FCM", // Split queue name prevents collision with AlarmManager
                     ExistingWorkPolicy.KEEP,
                     workRequest
                 )
-                Log.d(TAG, "[TRIGGER=FCM] 🚀 WallpaperWorker enqueued (KEEP policy)")
+                Log.d(TAG, "[TRIGGER=FCM] 🚀 WallpaperWorker expedited immediately via WallpaperUpdate_FCM")
             }
         }
     }

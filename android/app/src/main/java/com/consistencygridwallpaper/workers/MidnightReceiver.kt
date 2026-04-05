@@ -123,15 +123,15 @@ class MidnightReceiver : BroadcastReceiver() {
 
         // When forced (testing), cancel any stuck job first so KEEP policy doesn't block
         if (forceUpdate) {
-            WorkManager.getInstance(context).cancelUniqueWork("WallpaperUpdate_Daily")
+            WorkManager.getInstance(context).cancelUniqueWork("WallpaperUpdate_Alarm")
             Log.d(TAG, "🗑️ Cancelled existing job for forced test")
         }
 
         WorkManager.getInstance(context).enqueueUniqueWork(
-            "WallpaperUpdate_Daily",
+            "WallpaperUpdate_Alarm",
             if (forceUpdate) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
             workRequest
         )
-        Log.d(TAG, "🚀 WallpaperWorker enqueued (force=$forceUpdate)")
+        Log.d(TAG, "🚀 WallpaperWorker enqueued via WallpaperUpdate_Alarm (force=$forceUpdate)")
     }
 }

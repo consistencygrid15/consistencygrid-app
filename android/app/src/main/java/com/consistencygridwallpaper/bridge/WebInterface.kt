@@ -623,11 +623,13 @@ class WebInterface(private val context: Context) {
                 )
                 .build()
 
-            // Cancel any stuck daily job first, then replace with a fresh one
+            // Cancel any stuck daily job first across all possible queues, then replace with a fresh one
             val wm = androidx.work.WorkManager.getInstance(context)
             wm.cancelUniqueWork("WallpaperUpdate_Daily")
+            wm.cancelUniqueWork("WallpaperUpdate_Alarm")
+            wm.cancelUniqueWork("WallpaperUpdate_FCM")
             wm.enqueueUniqueWork(
-                "WallpaperUpdate_Daily",
+                "WallpaperUpdate_Force",
                 androidx.work.ExistingWorkPolicy.REPLACE,
                 workRequest
             )
