@@ -1195,6 +1195,15 @@ class MainActivity : AppCompatActivity() {
     private fun initFirebaseAndSendToken() {
         try {
             com.google.firebase.FirebaseApp.initializeApp(this)
+            
+            // Subscribe to timezone topic for batched server pushes
+            val timezone = java.util.TimeZone.getDefault().id
+            val safeTimezone = timezone.replace("/", "_").replace("[^a-zA-Z0-9_-]".toRegex(), "")
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().subscribeToTopic("daily_update_$safeTimezone")
+                .addOnCompleteListener { task ->
+                    Log.d(TAG, "FCM Topic subscription (daily_update_$safeTimezone) successful: ${task.isSuccessful}")
+                }
+
             com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
                 if (!task.isSuccessful) {
                     Log.w(TAG, "Fetching FCM registration token failed", task.exception)

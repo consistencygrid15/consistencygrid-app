@@ -230,7 +230,11 @@ class UserPrefs(context: Context) {
      * @return True if enabled, false otherwise. Defaults to false.
      */
     fun isAutoUpdateEnabled(): Boolean {
-        return prefs.getBoolean(KEY_AUTO_UPDATE, false)
+        // Default TRUE: every fresh install (or after an EncryptedSharedPreferences key reset)
+        // automatically schedules the midnight alarm. Without this, users who never opened
+        // the settings page — or whose prefs file was wiped by an OEM keystore reset — had
+        // auto-update silently disabled and the alarm was never registered.
+        return prefs.getBoolean(KEY_AUTO_UPDATE, true)
     }
 
     /**

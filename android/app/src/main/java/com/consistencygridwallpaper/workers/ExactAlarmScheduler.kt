@@ -26,10 +26,13 @@ object ExactAlarmScheduler {
     fun scheduleNextMidnightAlarm(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-        // Check permissions on Android 12+ (API 31+)
+        // ── Permission gate: Android 12+ requires SCHEDULE_EXACT_ALARM ──────────────
+        // If the user hasn't granted it (or it was revoked), we fall through to the
+        // PeriodicWorkRequest backup (Layer 2) instead of silently returning nothing.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (!alarmManager.canScheduleExactAlarms()) {
-                Log.w(TAG, "Cannot schedule exact alarms — permission not granted. Skipping.")
+                Log.w(TAG, "⚠️ Exact alarm permission not granted — activating Layer 2 (PeriodicWork) backup")
+                MidnightWorkScheduler.schedule(context)
                 return
             }
         }
@@ -38,18 +41,21 @@ object ExactAlarmScheduler {
         val updateHour   = userPrefs.getUpdateHour()   // default 0
         val updateMinute = userPrefs.getUpdateMinute() // default 0
 
-        // 🎲 Jitter: spread users over 0–30 minutes to avoid 100K simultaneous API calls
-        val jitterMs = Random.nextLong(0L, 30L * 60L * 1000L) // 0 to 1_800_000 ms
+        // ── Jitter: reduced to 0–5 minutes (was 0–30 minutes) ────────────────────────
+        // The old 0–30 min jitter, combined with OEM delays of 10–15 min on Xiaomi/OPPO,
+        // could push the execution to 00:44 AM — well past the 00:30 window.
+        // Spread across users is now handled server-side (FCM timestamps staggered by user ID).
+        // A small ≤5-min device-side jitter still prevents a perfect 100K hammer at 00:00.
+        val jitterMs = Random.nextLong(0L, 5L * 60L * 1000L) // 0 to 300_000 ms (5 minutes)
 
         val calendar = Calendar.getInstance().apply {
             timeInMillis = System.currentTimeMillis()
-            // Start from the configured time today
             set(Calendar.HOUR_OF_DAY, updateHour)
             set(Calendar.MINUTE, updateMinute)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
 
-            // If that time has already passed today, move to tomorrow
+            // If that time has already passed today, schedule for tomorrow
             if (timeInMillis <= System.currentTimeMillis()) {
                 add(Calendar.DAY_OF_YEAR, 1)
             }
@@ -57,12 +63,11 @@ object ExactAlarmScheduler {
 
         val targetTimeMs = calendar.timeInMillis + jitterMs
 
-        // Human-readable log so ADB can confirm the scheduled time
         val firedAt = Calendar.getInstance().apply { timeInMillis = targetTimeMs }
         val firedHH = firedAt.get(Calendar.HOUR_OF_DAY).toString().padStart(2, '0')
         val firedMM = firedAt.get(Calendar.MINUTE).toString().padStart(2, '0')
-        val jitterMin = (jitterMs / 1000 / 60).toInt()
-        Log.d(TAG, "Scheduling alarm for ${firedHH}:${firedMM} (jitter=${jitterMin}min, base=${updateHour}:${updateMinute.toString().padStart(2,'0')})") 
+        val jitterSec = (jitterMs / 1000).toInt()
+        Log.d(TAG, "⏰ Alarm scheduled for ${firedHH}:${firedMM} (jitter=${jitterSec}s, base=${updateHour}:${updateMinute.toString().padStart(2,'0')})")
 
         val intent = Intent(context, MidnightReceiver::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
@@ -73,15 +78,15 @@ object ExactAlarmScheduler {
         )
 
         try {
-            // Wake up the device and allow execution even in Doze mode
             alarmManager.setExactAndAllowWhileIdle(
                 AlarmManager.RTC_WAKEUP,
                 targetTimeMs,
                 pendingIntent
             )
-            Log.d(TAG, "✅ Exact alarm scheduled successfully for ${firedHH}:${firedMM}")
+            Log.d(TAG, "✅ setExactAndAllowWhileIdle registered — Layer 1 active")
         } catch (e: SecurityException) {
-            Log.e(TAG, "SecurityException: Failed to schedule exact alarm", e)
+            Log.e(TAG, "SecurityException scheduling exact alarm — activating Layer 2 backup", e)
+            MidnightWorkScheduler.schedule(context)
         }
     }
 

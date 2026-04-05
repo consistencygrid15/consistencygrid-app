@@ -101,16 +101,20 @@ class WallpaperMessagingService : FirebaseMessagingService() {
                 Log.d(TAG, "[TRIGGER=FCM] Rescheduling next alarm to ensure chain continuity...")
                 ExactAlarmScheduler.scheduleNextMidnightAlarm(applicationContext)
 
-                // ── Fix 3.3: Enqueue worker with TRIGGER tag ───────────────────────
-                // Duplicate-run guard is inside WallpaperWorker.doWork() — it will skip
-                // gracefully if today's update already happened.
+                // ── Fix 3.3: Enqueue worker with RANDOM JITTER ────────────────────
+                // Server sends "jitter_max_minutes" (e.g. 60). We delay rendering
+                // randomly within this window so 100k users don't hit the server at once.
+                val maxJitterMinutes = remoteMessage.data["jitter_max_minutes"]?.toLongOrNull() ?: 30L
+                val randomDelaySeconds = kotlin.random.Random.nextLong(0, maxJitterMinutes * 60)
+                Log.d(TAG, "[TRIGGER=FCM] 🎲 Adding random jitter delay: $randomDelaySeconds seconds")
+
                 val workRequest = OneTimeWorkRequestBuilder<WallpaperWorker>()
                     .setInputData(
                         androidx.work.Data.Builder()
                             .putString("TRIGGER", "FCM")
                             .build()
                     )
-                    .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                    .setInitialDelay(randomDelaySeconds, TimeUnit.SECONDS)
                     .setBackoffCriteria(
                         androidx.work.BackoffPolicy.EXPONENTIAL,
                         10, // 10 minutes initial, then 20, 40
