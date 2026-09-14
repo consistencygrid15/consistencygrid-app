@@ -251,7 +251,17 @@ class SyncRepository(private val context: Context) {
                             val localId  = obj["localId"].asString
                             val serverId = obj["serverId"]?.takeIf { !it.isJsonNull }?.asString
                             val status   = obj["status"].asString
-                            if (status == "created" && localId != serverId) {
+                            if (status == "created" && localId != serverId && serverId != null) {
+                                // Server assigned a real cuid — replace the local placeholder row
+                                // IMPORTANT: Insert the server-ID row BEFORE deleting the local one
+                                val localReminder = db.reminderDao().getReminderById(localId)
+                                if (localReminder != null) {
+                                    db.reminderDao().insertReminder(localReminder.copy(
+                                        id       = serverId,
+                                        serverId = serverId,
+                                        isSynced = true
+                                    ))
+                                }
                                 db.reminderDao().deleteReminderById(localId)
                             } else {
                                 syncedIds.add(localId)
