@@ -119,8 +119,10 @@ class AuthManager private constructor(private val context: Context) {
             val json = JSONObject().apply { put("publicToken", publicToken) }
             val body = json.toString().toRequestBody("application/json".toMediaType())
 
+            val baseUrl = userPrefs.getBaseUrl().trimEnd('/')
             val request = Request.Builder()
-                .url(REFRESH_URL)
+                .url("$baseUrl/api/native-auth/refresh")
+                .addHeader("Authorization", "Bearer $publicToken")
                 .post(body)
                 .build()
 

@@ -300,7 +300,11 @@ class UserPrefs(context: Context) {
      * Used for constructing API and renderer URLs.
      */
     fun getBaseUrl(): String {
-        return prefs.getString(KEY_BASE_URL, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
+        val stored = prefs.getString(KEY_BASE_URL, null)
+        if (stored.isNullOrBlank() || stored.contains("consistencygrid.com") || stored.contains("netlify.app")) {
+            return DEFAULT_BASE_URL
+        }
+        return stored
     }
 
     /**

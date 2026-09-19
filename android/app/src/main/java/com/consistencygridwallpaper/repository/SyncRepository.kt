@@ -11,8 +11,10 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 import androidx.work.Constraints
 import androidx.work.NetworkType
@@ -50,8 +52,6 @@ class SyncRepository(private val context: Context) {
         }
     }
 
-    private fun api() = ApiClient.getService(prefs.getBaseUrl(), prefs.getToken())
-
     /**
      * Full offline-first sync:
      *   PUSH: unsynced habits → /api/mobile/habits/sync
@@ -74,6 +74,13 @@ class SyncRepository(private val context: Context) {
         }
         Log.d(TAG, "syncWithServer: authenticated sync started")
         try {
+
+            val baseUrl = prefs.getBaseUrl().trimEnd('/')
+            val httpClient = OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .build()
 
             // ── 1. Push unsynced habits FIRST (creates, edits, soft-deletes) ──
             // Must precede habit ticks so newly created habits have a valid serverId
@@ -100,8 +107,16 @@ class SyncRepository(private val context: Context) {
                     add("deletes", deletesArr)
                 }
                 try {
-                    val res = api().syncHabits(habitPayload)
-                    if (res["success"]?.asBoolean == true) {
+                    val req = Request.Builder()
+                        .url("$baseUrl/api/mobile/habits/sync")
+                        .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Cookie", "publicToken=$token; native_auth=true")
+                        .post(habitPayload.toString().toRequestBody("application/json".toMediaType()))
+                        .build()
+                    val response = httpClient.newCall(req).execute()
+                    val responseBody = response.body?.string() ?: "{}"
+                    val res = JsonParser.parseString(responseBody).takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject()
+                    if (response.isSuccessful && res["success"]?.asBoolean == true) {
                         val upsertedArr = res["upserted"]?.asJsonArray
                         upsertedArr?.forEach { elem ->
                             val obj      = elem.asJsonObject
@@ -131,10 +146,10 @@ class SyncRepository(private val context: Context) {
                         }
                         Log.d(TAG, "Pushed ${upsertsArr.size()} habits, ${deletesArr.size()} deletes to remote database")
                     } else {
-                        Log.w(TAG, "Habit push returned non-success: $res")
+                        Log.w(TAG, "Habit push returned HTTP ${response.code}: $responseBody")
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Habit push failed (non-fatal): ${e.message}")
+                    Log.e(TAG, "Habit push failed: ${e.message}", e)
                 }
             }
 
@@ -154,15 +169,23 @@ class SyncRepository(private val context: Context) {
                         })
                     }
                     payload.add("logs", logsArr)
-                    val res = api().syncHabitLogs(payload)
-                    if (res["success"]?.asBoolean == true) {
+                    val req = Request.Builder()
+                        .url("$baseUrl/api/mobile/habits/tick")
+                        .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Cookie", "publicToken=$token; native_auth=true")
+                        .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                        .build()
+                    val response = httpClient.newCall(req).execute()
+                    val responseBody = response.body?.string() ?: "{}"
+                    val res = JsonParser.parseString(responseBody).takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject()
+                    if (response.isSuccessful && res["success"]?.asBoolean == true) {
                         db.habitLogDao().markLogsSynced(unsyncedLogs.map { it.id })
                         Log.d(TAG, "Pushed ${unsyncedLogs.size} offline ticks to remote database")
                     } else {
-                        Log.w(TAG, "Habit tick push returned non-success: $res")
+                        Log.w(TAG, "Habit tick push returned HTTP ${response.code}: $responseBody")
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Habit tick push failed (non-fatal): ${e.message}")
+                    Log.e(TAG, "Habit tick push failed: ${e.message}", e)
                 }
             }
 
@@ -191,8 +214,16 @@ class SyncRepository(private val context: Context) {
                 payload.add("upserts", upsertsArr)
                 payload.add("deletes", deletesArr)
                 try {
-                    val res = api().syncGoals(payload)
-                    if (res["success"]?.asBoolean == true) {
+                    val req = Request.Builder()
+                        .url("$baseUrl/api/mobile/goals/sync")
+                        .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Cookie", "publicToken=$token; native_auth=true")
+                        .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                        .build()
+                    val response = httpClient.newCall(req).execute()
+                    val responseBody = response.body?.string() ?: "{}"
+                    val res = JsonParser.parseString(responseBody).takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject()
+                    if (response.isSuccessful && res["success"]?.asBoolean == true) {
                         val upsertedArr = res["upserted"]?.asJsonArray
                         upsertedArr?.forEach { elem ->
                             val obj      = elem.asJsonObject
@@ -217,9 +248,11 @@ class SyncRepository(private val context: Context) {
                         }
                         unsyncedGoals.filter { it.isDeleted }.forEach { db.goalDao().deleteGoalById(it.id) }
                         Log.d(TAG, "Pushed ${upsertsArr.size()} goals, ${deletesArr.size()} deletes")
+                    } else {
+                        Log.w(TAG, "Goal sync push returned HTTP ${response.code}: $responseBody")
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Goal sync push failed: ${e.message}")
+                    Log.e(TAG, "Goal sync push failed: ${e.message}", e)
                 }
             }
 
@@ -251,8 +284,16 @@ class SyncRepository(private val context: Context) {
                 payload.add("upserts", upsertsArr)
                 payload.add("deletes", deletesArr)
                 try {
-                    val res = api().syncReminders(payload)
-                    if (res["success"]?.asBoolean == true) {
+                    val req = Request.Builder()
+                        .url("$baseUrl/api/mobile/reminders/sync")
+                        .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Cookie", "publicToken=$token; native_auth=true")
+                        .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                        .build()
+                    val response = httpClient.newCall(req).execute()
+                    val responseBody = response.body?.string() ?: "{}"
+                    val res = JsonParser.parseString(responseBody).takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject()
+                    if (response.isSuccessful && res["success"]?.asBoolean == true) {
                         val upsertedArr = res["upserted"]?.asJsonArray
                         val syncedIds   = mutableListOf<String>()
                         upsertedArr?.forEach { elem ->
@@ -261,8 +302,6 @@ class SyncRepository(private val context: Context) {
                             val serverId = obj["serverId"]?.takeIf { !it.isJsonNull }?.asString
                             val status   = obj["status"].asString
                             if (status == "created" && localId != serverId && serverId != null) {
-                                // Server assigned a real cuid — replace the local placeholder row
-                                // IMPORTANT: Insert the server-ID row BEFORE deleting the local one
                                 val localReminder = db.reminderDao().getReminderById(localId)
                                 if (localReminder != null) {
                                     db.reminderDao().insertReminder(localReminder.copy(
@@ -279,9 +318,11 @@ class SyncRepository(private val context: Context) {
                         if (syncedIds.isNotEmpty()) db.reminderDao().markRemindersSynced(syncedIds)
                         unsyncedReminders.filter { it.isDeleted }.forEach { db.reminderDao().deleteReminderById(it.id) }
                         Log.d(TAG, "Pushed ${upsertsArr.size()} reminders, ${deletesArr.size()} deletes")
+                    } else {
+                        Log.w(TAG, "Reminder sync push returned HTTP ${response.code}: $responseBody")
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Reminder sync push failed: ${e.message}")
+                    Log.e(TAG, "Reminder sync push failed: ${e.message}", e)
                 }
             }
 
@@ -307,26 +348,30 @@ class SyncRepository(private val context: Context) {
                 }
                 payload.add("apps", appsArr)
                 try {
-                    val res = api().syncReelController(payload)
-                    if (res["success"]?.asBoolean == true) {
+                    val req = Request.Builder()
+                        .url("$baseUrl/api/mobile/reel-controller/sync")
+                        .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Cookie", "publicToken=$token; native_auth=true")
+                        .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                        .build()
+                    val response = httpClient.newCall(req).execute()
+                    val responseBody = response.body?.string() ?: "{}"
+                    val res = JsonParser.parseString(responseBody).takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject()
+                    if (response.isSuccessful && res["success"]?.asBoolean == true) {
                         if (unsyncedReelApps.isNotEmpty())
                             db.reelControllerDao().markAppsSynced(unsyncedReelApps.map { it.pkg })
                         if (globalReelConfig?.isSynced == false)
                             db.reelControllerDao().markGlobalSynced()
                         Log.d(TAG, "Pushed reel controller: ${unsyncedReelApps.size} apps + global")
+                    } else {
+                        Log.w(TAG, "Reel controller push returned HTTP ${response.code}: $responseBody")
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Reel controller sync push failed (non-fatal): ${e.message}")
+                    Log.e(TAG, "Reel controller sync push failed: ${e.message}", e)
                 }
             }
 
             // ── 2. Fetch full server state ────────────────────────────────────────
-            val httpClient = OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
-                .build()
-
-            val baseUrl      = prefs.getBaseUrl().trimEnd('/')
             val tz           = java.util.TimeZone.getDefault().id
             val deviceDate   = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
             val url          = "$baseUrl/api/wallpaper-data" +
@@ -541,9 +586,17 @@ class SyncRepository(private val context: Context) {
 
             // ── 7. Fetch Reel Controller config from server ───────────────────────
             try {
-                val reelRes = api().getReelController()
-                if (reelRes["success"]?.asBoolean == true) {
-                    val data = reelRes["data"]?.asJsonObject
+                val reelReq = Request.Builder()
+                    .url("$baseUrl/api/mobile/reel-controller")
+                    .addHeader("Authorization", "Bearer $token")
+                    .addHeader("Cookie", "publicToken=$token; native_auth=true")
+                    .get()
+                    .build()
+                val reelRes = httpClient.newCall(reelReq).execute()
+                val reelBody = reelRes.body?.string() ?: "{}"
+                val reelJson = JsonParser.parseString(reelBody).takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject()
+                if (reelRes.isSuccessful && reelJson["success"]?.asBoolean == true) {
+                    val data = reelJson["data"]?.asJsonObject
                     val appEntities = data?.get("apps")?.asJsonArray?.mapNotNull { elem ->
                         runCatching {
                             val a = elem.asJsonObject

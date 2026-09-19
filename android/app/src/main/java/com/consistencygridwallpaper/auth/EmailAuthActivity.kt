@@ -143,12 +143,12 @@ class EmailAuthActivity : AppCompatActivity() {
             return
         }
 
+        val baseUrl = userPrefs.getBaseUrl().trimEnd('/')
         lifecycleScope.launch {
             val response = withContext(Dispatchers.IO) {
-                // Try primary endpoint first, then secondary Netlify endpoint
                 val params = mapOf("name" to name, "email" to email, "password" to password)
-                callBackendAPI("$BASE_URL/email-signup", params)
-                    ?: callBackendAPI("$FALLBACK_URL/email-signup", params)
+                callBackendAPI("$baseUrl/api/native-auth/email-signup", params)
+                    ?: callBackendAPI("$BASE_URL/email-signup", params)
             }
 
             if (response != null && isSuccessJsonResponse(response)) {
@@ -174,11 +174,12 @@ class EmailAuthActivity : AppCompatActivity() {
             return
         }
 
+        val baseUrl = userPrefs.getBaseUrl().trimEnd('/')
         lifecycleScope.launch {
             val response = withContext(Dispatchers.IO) {
                 val params = mapOf("email" to email, "password" to password)
-                callBackendAPI("$BASE_URL/email-login", params)
-                    ?: callBackendAPI("$FALLBACK_URL/email-login", params)
+                callBackendAPI("$baseUrl/api/native-auth/email-login", params)
+                    ?: callBackendAPI("$BASE_URL/email-login", params)
             }
 
             if (response != null && isSuccessJsonResponse(response)) {

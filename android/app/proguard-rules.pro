@@ -45,11 +45,28 @@
 -keep class * extends androidx.room.RoomDatabase { *; }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# NETWORKING
+# NETWORKING & SERIALIZATION (Retrofit, Gson, OkHttp)
 # ─────────────────────────────────────────────────────────────────────────────
 -dontwarn okhttp3.**
 -dontwarn okio.**
 -dontwarn retrofit2.**
+
+-keepattributes Signature, InnerClasses, EnclosingMethod
+-keepattributes *Annotation*
+-keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
+
+-keepclassmembers,allowshrinking,allowobfuscation interface * {
+    @retrofit2.http.* <methods>;
+}
+
+-keep class com.google.gson.** { *; }
+-keepclassmembers class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+
+-keep interface com.consistencygridwallpaper.network.** { *; }
+-keep class com.consistencygridwallpaper.network.** { *; }
+-keep class com.consistencygridwallpaper.storage.room.** { *; }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GOOGLE PLAY BILLING — Must NOT be obfuscated
