@@ -1,0 +1,36 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="250dp"
+    android:height="110dp"
+    android:viewportWidth="250"
+    android:viewportHeight="110">
+    <!-- Dark background -->
+    <path android:fillColor="#1C1C1E"
+        android:pathData="M8,0 L242,0 Q250,0 250,8 L250,102 Q250,110 242,110 L8,110 Q0,110 0,102 L0,8 Q0,0 8,0 Z"/>
+    <!-- Orange header line -->
+    <path android:fillColor="#FF7A00"
+        android:pathData="M14,14 L130,14 Q132,14 132,16 L132,20 Q132,22 130,22 L14,22 Q12,22 12,20 L12,16 Q12,14 14,14 Z"/>
+    <!-- Divider -->
+    <path android:fillColor="#FF7A0040"
+        android:pathData="M12,26 L238,26 L238,27 L12,27 Z"/>
+    <!-- Habit row 1 - orange bar + checked box -->
+    <path android:fillColor="#FF7A00" android:pathData="M12,33 L15,33 L15,43 L12,43 Z"/>
+    <path android:fillColor="#FF7A00" android:pathData="M20,35 Q22,35 22,37 L22,41 Q22,43 20,43 L18,43 Q16,43 16,41 L16,37 Q16,35 18,35 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M17.5,39 L19,40.5 L21.5,37"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M25,37 L90,37 Q91,37 91,38.5 Q91,40 90,40 L25,40 Q24,40 24,38.5 Q24,37 25,37 Z"/>
+    <path android:fillColor="#555555" android:pathData="M25,41 L70,41 Q71,41 71,42 Q71,43 70,43 L25,43 Q24,43 24,42 Q24,41 25,41 Z"/>
+    <!-- Habit row 2 - orange bar + unchecked -->
+    <path android:fillColor="#FF7A00" android:pathData="M12,48 L15,48 L15,58 L12,58 Z"/>
+    <path android:strokeColor="#777777" android:strokeWidth="1.5"
+        android:pathData="M18,50 Q16,50 16,52 L16,56 Q16,58 18,58 L20,58 Q22,58 22,56 L22,52 Q22,50 20,50 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M25,52 L90,52 Q91,52 91,53.5 Q91,55 90,55 L25,55 Q24,55 24,53.5 Q24,52 25,52 Z"/>
+    <path android:fillColor="#555555" android:pathData="M25,56 L65,56 Q66,56 66,57 Q66,58 65,58 L25,58 Q24,58 24,57 Q24,56 25,56 Z"/>
+    <!-- Habit row 3 -->
+    <path android:fillColor="#FF7A00" android:pathData="M12,63 L15,63 L15,73 L12,73 Z"/>
+    <path android:strokeColor="#777777" android:strokeWidth="1.5"
+        android:pathData="M18,65 Q16,65 16,67 L16,71 Q16,73 18,73 L20,73 Q22,73 22,71 L22,67 Q22,65 20,65 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M25,67 L80,67 Q81,67 81,68.5 Q81,70 80,70 L25,70 Q24,70 24,68.5 Q24,67 25,67 Z"/>
+    <path android:fillColor="#555555" android:pathData="M25,71 L55,71 Q56,71 56,72 Q56,73 55,73 L25,73 Q24,73 24,72 Q24,71 25,71 Z"/>
+    <!-- "Daily Habits" label -->
+    <path android:fillColor="#FF7A00"
+        android:pathData="M14,15 L90,15 Q91,15 91,17 Q91,19 90,19 L14,19 Q13,19 13,17 Q13,15 14,15 Z"/>
+</vector>

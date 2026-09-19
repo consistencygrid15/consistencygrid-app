@@ -73,3 +73,30 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Firebase & Keystore secrets (Security)
+**/google-services.json
+**/keystore.properties
+*.jks
+.env
+*.env
+**/.env
+**/.env.*
+
+# Logs and debug dumps
+*.log
+*.txt
+dump_log.txt
+logcat*.txt
+log_debug*.txt
+android_log.txt
+logg.txt
+hs_err_*
+replay_*
+
+# Android binary builds
+*.aab
+*.apk
+*.png
+
+

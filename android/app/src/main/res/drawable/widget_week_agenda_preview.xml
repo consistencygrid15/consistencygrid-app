@@ -1,0 +1,44 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="60dp"
+    android:viewportWidth="120"
+    android:viewportHeight="60">
+    <!-- Dark Glass Background -->
+    <path
+        android:pathData="M6,2 h108 a6,6 0 0 1 6,6 v44 a6,6 0 0 1 -6,6 h-108 a6,6 0 0 1 -6,-6 v-44 a6,6 0 0 1 6,-6 z"
+        android:fillColor="#09090b" />
+    <path
+        android:pathData="M6,2 h108 a6,6 0 0 1 6,6 v44 a6,6 0 0 1 -6,6 h-108 a6,6 0 0 1 -6,-6 v-44 a6,6 0 0 1 6,-6 z"
+        android:strokeColor="#333333"
+        android:strokeWidth="1" />
+    <!-- Title -->
+    <path
+        android:pathData="M15,12 h35 v3 h-35 z"
+        android:fillColor="#ffffff" />
+    <!-- Week strip days (7 days of week) -->
+    <path
+        android:pathData="M15,22h10v10h-10z"
+        android:fillColor="#FF7A00" />
+    <path
+        android:pathData="M29,22h10v10h-10z"
+        android:fillColor="#27272a" />
+    <path
+        android:pathData="M43,22h10v10h-10z"
+        android:fillColor="#FF7A00" />
+    <path
+        android:pathData="M57,22h10v10h-10z"
+        android:fillColor="#FF7A00" />
+    <path
+        android:pathData="M71,22h10v10h-10z"
+        android:fillColor="#27272a" />
+    <path
+        android:pathData="M85,22h10v10h-10z"
+        android:fillColor="#27272a" />
+    <path
+        android:pathData="M99,22h10v10h-10z"
+        android:fillColor="#FF7A00" />
+    <!-- Small label bars below each day box -->
+    <path
+        android:pathData="M17,36h6v2h-6z M31,36h6v2h-6z M45,36h6v2h-6z M59,36h6v2h-6z M73,36h6v2h-6z M87,36h6v2h-6z M101,36h6v2h-6z"
+        android:fillColor="#888888" />
+</vector>

@@ -8,8 +8,10 @@ import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.consistencygridwallpaper.R
+import com.consistencygridwallpaper.storage.UserPrefs
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.Dispatchers
@@ -24,16 +26,17 @@ import java.util.concurrent.TimeUnit
 
 /**
  * EmailAuthActivity - Email/Password authentication
- * 
- * Handles both signup and login modes.
- * Validates input, calls backend API, and returns result to AuthActivity.
+ * Enhanced with Edge-to-Edge support.
  */
 class EmailAuthActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "EmailAuthActivity"
+        const val MODE_SIGNUP = "signup"
+        const val MODE_LOGIN = "login"
         private const val BASE_URL = "https://consistencygrid.com/api/native-auth"
-        private const val TIMEOUT_SECONDS = 30L
+        private const val FALLBACK_URL = "https://consistencygrid.netlify.app/api/native-auth"
+        private const val TIMEOUT_SECONDS = 15L
     }
 
     private lateinit var tvTitle: TextView
@@ -52,13 +55,15 @@ class EmailAuthActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Edge-to-Edge support
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        
         setContentView(R.layout.activity_email_auth)
 
-        // Get mode from intent
-        val mode = intent.getStringExtra("MODE") ?: AuthActivity.MODE_SIGNUP
-        isSignupMode = mode == AuthActivity.MODE_SIGNUP
+        val mode = intent.getStringExtra("MODE") ?: MODE_SIGNUP
+        isSignupMode = mode == MODE_SIGNUP
 
-        // Initialize views
         tvTitle = findViewById(R.id.tv_title)
         tilName = findViewById(R.id.til_name)
         etName = findViewById(R.id.et_name)
@@ -71,17 +76,11 @@ class EmailAuthActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progress_bar)
         tvError = findViewById(R.id.tv_error)
 
-        // Update UI based on mode
         updateUI()
 
-        // Set click listeners
         btnSubmit.setOnClickListener {
             if (validateInput()) {
-                if (isSignupMode) {
-                    performSignup()
-                } else {
-                    performLogin()
-                }
+                if (isSignupMode) performSignup() else performLogin()
             }
         }
 
@@ -91,9 +90,6 @@ class EmailAuthActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Update UI based on current mode (signup vs login)
-     */
     private fun updateUI() {
         if (isSignupMode) {
             tvTitle.text = "Create Account"
@@ -109,9 +105,6 @@ class EmailAuthActivity : AppCompatActivity() {
         tvError.visibility = View.GONE
     }
 
-    /**
-     * Validate user input
-     */
     private fun validateInput(): Boolean {
         val email = etEmail.text.toString().trim()
         val password = etPassword.text.toString()
@@ -121,166 +114,214 @@ class EmailAuthActivity : AppCompatActivity() {
             showError("Name must be at least 2 characters")
             return false
         }
-
         if (email.isEmpty() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             showError("Please enter a valid email")
             return false
         }
-
         if (password.length < 8) {
             showError("Password must be at least 8 characters")
             return false
         }
-
         return true
     }
 
-    /**
-     * Perform signup
-     */
     private fun performSignup() {
         showLoading()
-
         val name = etName.text.toString().trim()
         val email = etEmail.text.toString().trim()
         val password = etPassword.text.toString()
 
+        val userPrefs = UserPrefs(this)
+        val registeredProvider = userPrefs.getRegisteredProvider(email)
+        if (registeredProvider == "GOOGLE") {
+            showError("This email is registered via Google Sign-In. Please tap 'Continue with Google'.")
+            hideLoading()
+            return
+        } else if (registeredProvider == "EMAIL") {
+            showError("Account already exists with this email. Please tap 'Already have an account? Log in'.")
+            hideLoading()
+            return
+        }
+
         lifecycleScope.launch {
-            try {
-                val result = withContext(Dispatchers.IO) {
-                    callBackendAPI("$BASE_URL/email-signup", mapOf(
-                        "name" to name,
-                        "email" to email,
-                        "password" to password
-                    ))
-                }
+            val response = withContext(Dispatchers.IO) {
+                // Try primary endpoint first, then secondary Netlify endpoint
+                val params = mapOf("name" to name, "email" to email, "password" to password)
+                callBackendAPI("$BASE_URL/email-signup", params)
+                    ?: callBackendAPI("$FALLBACK_URL/email-signup", params)
+            }
 
-                handleResponse(result)
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Signup failed", e)
-                showError("Network error. Please check your connection.")
+            if (response != null && isSuccessJsonResponse(response)) {
+                handleResponse(response)
+            } else {
+                Log.w(TAG, "Signup backend unavailable or rejected the request")
+                showError("Unable to create your account right now. Please check your connection and try again.")
                 hideLoading()
             }
         }
     }
 
-    /**
-     * Perform login
-     */
     private fun performLogin() {
         showLoading()
-
         val email = etEmail.text.toString().trim()
         val password = etPassword.text.toString()
 
+        val userPrefs = UserPrefs(this)
+        val registeredProvider = userPrefs.getRegisteredProvider(email)
+        if (registeredProvider == "GOOGLE") {
+            showError("This email was registered using Google Sign-In. Please tap 'Continue with Google'.")
+            hideLoading()
+            return
+        }
+
         lifecycleScope.launch {
-            try {
-                val result = withContext(Dispatchers.IO) {
-                    callBackendAPI("$BASE_URL/email-login", mapOf(
-                        "email" to email,
-                        "password" to password
-                    ))
-                }
+            val response = withContext(Dispatchers.IO) {
+                val params = mapOf("email" to email, "password" to password)
+                callBackendAPI("$BASE_URL/email-login", params)
+                    ?: callBackendAPI("$FALLBACK_URL/email-login", params)
+            }
 
-                handleResponse(result)
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Login failed", e)
-                showError("Network error. Please check your connection.")
+            if (response != null && isSuccessJsonResponse(response)) {
+                handleResponse(response)
+            } else {
+                Log.w(TAG, "Login backend unavailable or rejected the request")
+                showError("Unable to sign in right now. Please check your connection and try again.")
                 hideLoading()
             }
         }
     }
 
-    /**
-     * Call backend API
-     */
     private fun callBackendAPI(url: String, params: Map<String, String>): String? {
-        val client = OkHttpClient.Builder()
-            .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .build()
-
-        val json = JSONObject(params)
-        val body = json.toString().toRequestBody("application/json".toMediaType())
-
-        val request = Request.Builder()
-            .url(url)
-            .post(body)
-            .build()
-
-        Log.d(TAG, "callBackendAPI: Calling $url")
-        
-        val response = client.newCall(request).execute()
-        val responseBody = response.body?.string()
-        
-        Log.d(TAG, "callBackendAPI: Response code = ${response.code}")
-        
-        return if (response.isSuccessful) {
-            Log.d(TAG, "callBackendAPI: Success")
-            responseBody
-        } else {
-            Log.e(TAG, "callBackendAPI: Failed with code ${response.code}")
-            Log.e(TAG, "callBackendAPI: Error body = $responseBody")
+        return try {
+            val client = OkHttpClient.Builder()
+                .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .build()
+            val body = JSONObject(params).toString().toRequestBody("application/json".toMediaType())
+            val request = Request.Builder().url(url).post(body).build()
+            val response = client.newCall(request).execute()
+            if (response.isSuccessful) {
+                response.body?.string()
+            } else {
+                Log.w(TAG, "API call to $url returned HTTP ${response.code}")
+                null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "API call to $url failed: ${e.message}")
             null
         }
     }
 
-    /**
-     * Handle API response
-     */
+    private fun isSuccessJsonResponse(body: String): Boolean {
+        return try {
+            val json = JSONObject(body)
+            json.optBoolean("success", false)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun handleResponse(responseBody: String?) {
-        if (responseBody != null) {
+        if (!responseBody.isNullOrBlank()) {
             try {
                 val jsonResponse = JSONObject(responseBody)
+                if (jsonResponse.optBoolean("success", false)) {
+                    val token        = jsonResponse.optString("token", "")
+                    val sessionToken = jsonResponse.optString("sessionToken", "")
+                    val onboarded    = jsonResponse.optBoolean("onboarded", false)
+                    val expiresAt    = jsonResponse.optLong("expiresAt", 0L)
+                    
+                    val email = jsonResponse.optJSONObject("user")?.optString("email")
+                        ?.ifBlank { null }
+                        ?: jsonResponse.optString("email", "")
+                        .ifBlank { null }
+                        ?: etEmail.text.toString().trim()
 
-                if (jsonResponse.getBoolean("success")) {
-                    val token = jsonResponse.getString("token")
-                    val onboarded = jsonResponse.getBoolean("onboarded")
+                    val name = jsonResponse.optJSONObject("user")?.optString("name")
+                        ?.ifBlank { null }
+                        ?: jsonResponse.optString("name", "")
+                        .ifBlank { null }
+                        ?: etName.text.toString().trim().ifBlank { email.substringBefore("@").replace(".", " ").capitalize() }
 
-                    // Return result to AuthActivity
-                    val resultIntent = Intent()
-                    resultIntent.putExtra("token", token)
-                    resultIntent.putExtra("onboarded", onboarded)
-                    setResult(RESULT_OK, resultIntent)
-                    finish()
+                    if (token.isBlank()) {
+                        showError("Server returned invalid authentication response.")
+                        hideLoading()
+                        return
+                    }
+
+                    val authManager = AuthManager.getInstance(applicationContext)
+                    authManager.saveAuthData(token, sessionToken, onboarded, expiresAt)
+                    val userPrefs = UserPrefs(applicationContext)
+                    userPrefs.saveToken(token)
+                    userPrefs.saveSessionToken(sessionToken)
+                    userPrefs.saveOnboardedStatus(onboarded)
+                    userPrefs.registerAccount(email, "EMAIL")
+
+                    // Save email + name into Room synchronously before finish()
+                    lifecycleScope.launch {
+                        withContext(Dispatchers.IO) {
+                            try {
+                                val db = com.consistencygridwallpaper.storage.room.AppDatabase.getDatabase(applicationContext)
+                                val existing = db.userProfileDao().get()
+
+                                db.userProfileDao().upsert(
+                                    com.consistencygridwallpaper.storage.room.UserProfileEntity(
+                                        id          = 1,
+                                        name        = name.ifBlank { existing?.name ?: "ConsistencyGrid User" },
+                                        email       = email.ifBlank { existing?.email ?: "" },
+                                        plan        = existing?.plan ?: "free",
+                                        publicToken = token,
+                                        updatedAt   = System.currentTimeMillis()
+                                    )
+                                )
+                                Log.d(TAG, "Successfully saved user profile to Room database: name='$name', email='$email'")
+
+                                // Immediately trigger sync so local guest data is pushed and remote cloud data is pulled
+                                com.consistencygridwallpaper.repository.SyncRepository(applicationContext).syncWithServer()
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Failed to cache user profile or sync: ${e.message}")
+                            }
+                        }
+
+                        val resultIntent = Intent().apply {
+                            putExtra("token",        token)
+                            putExtra("sessionToken", sessionToken)
+                            putExtra("onboarded",    onboarded)
+                            putExtra("expiresAt",    expiresAt)
+                            putExtra("name",         name)
+                            putExtra("email",        email)
+                        }
+                        setResult(RESULT_OK, resultIntent)
+                        finish()
+                    }
                 } else {
-                    val error = jsonResponse.optString("error", "Authentication failed")
-                    showError(error)
+                    val errorMsg = jsonResponse.optString("error", "Authentication failed")
+                    showError(errorMsg)
                     hideLoading()
                 }
             } catch (e: Exception) {
-                showError("Invalid response from server")
+                Log.e(TAG, "Failed to parse auth response", e)
+                showError("Invalid server response.")
                 hideLoading()
             }
         } else {
-            showError("Server error. Please try again later.")
+            showError("Server error. Please try again.")
             hideLoading()
         }
     }
 
-    /**
-     * Show loading indicator
-     */
     private fun showLoading() {
         progressBar.visibility = View.VISIBLE
         btnSubmit.isEnabled = false
         tvError.visibility = View.GONE
     }
 
-    /**
-     * Hide loading indicator
-     */
     private fun hideLoading() {
         progressBar.visibility = View.GONE
         btnSubmit.isEnabled = true
     }
 
-    /**
-     * Show error message
-     */
     private fun showError(message: String) {
         tvError.text = message
         tvError.visibility = View.VISIBLE

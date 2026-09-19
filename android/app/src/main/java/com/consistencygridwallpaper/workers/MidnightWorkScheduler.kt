@@ -2,9 +2,7 @@ package com.consistencygridwallpaper.workers
 
 import android.content.Context
 import android.util.Log
-import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
@@ -63,6 +61,20 @@ object MidnightWorkScheduler {
     // the midnight window even if the alarm fires 30 minutes late on an OEM device.
     private const val FLEX_MINUTES = 45L
 
+    private fun calculateInitialDelayMs(): Long {
+        val now = java.util.Calendar.getInstance()
+        val target = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+            if (timeInMillis <= now.timeInMillis) {
+                add(java.util.Calendar.DAY_OF_YEAR, 1)
+            }
+        }
+        return target.timeInMillis - now.timeInMillis
+    }
+
     /**
      * Schedules (or keeps alive) the 24-hour periodic backup job.
      *
@@ -72,15 +84,22 @@ object MidnightWorkScheduler {
      *  - BootReceiver.onReceive()
      */
     fun schedule(context: Context) {
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
+        val userPrefs = com.consistencygridwallpaper.storage.UserPrefs(context)
+        val isAligned = userPrefs.getBoolean("isPeriodicWorkAlignedToMidnight", false)
 
+        val initialDelayMs = calculateInitialDelayMs()
+        val delayHours = TimeUnit.MILLISECONDS.toHours(initialDelayMs)
+        val delayMinutes = TimeUnit.MILLISECONDS.toMinutes(initialDelayMs) % 60
+        Log.d(TAG, "Calculating initial delay to midnight: ${delayHours}h ${delayMinutes}m ($initialDelayMs ms)")
+
+        // NO network constraint — rendering is 100% local (Room DB + WebView asset).
+        // Internet is needed only for optional server sync (analytics), which we do
+        // best-effort after the wallpaper is applied, not before.
         val request = PeriodicWorkRequestBuilder<WallpaperWorker>(
             REPEAT_INTERVAL_HOURS, TimeUnit.HOURS,
             FLEX_MINUTES,           TimeUnit.MINUTES
         )
-            .setConstraints(constraints)
+            .setInitialDelay(initialDelayMs, TimeUnit.MILLISECONDS)
             .setInputData(
                 androidx.work.Data.Builder()
                     .putString("TRIGGER", "PERIODIC_BACKUP")
@@ -93,13 +112,23 @@ object MidnightWorkScheduler {
             .addTag("WALLPAPER_PERIODIC_BACKUP")
             .build()
 
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            WORK_NAME,
-            // KEEP: don't reset the 24-hour timer on repeat calls (e.g. every app open)
-            ExistingPeriodicWorkPolicy.KEEP,
-            request
-        )
-        Log.d(TAG, "✅ Periodic backup job scheduled (24h interval, ${FLEX_MINUTES}min flex, KEEP policy)")
+        if (!isAligned) {
+            // Force update once to align existing/old periodic work requests to midnight
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                WORK_NAME,
+                ExistingPeriodicWorkPolicy.UPDATE,
+                request
+            )
+            userPrefs.setBoolean("isPeriodicWorkAlignedToMidnight", true)
+            Log.d(TAG, "✅ Periodic backup job updated to midnight (UPDATE policy used to reschedule)")
+        } else {
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                WORK_NAME,
+                ExistingPeriodicWorkPolicy.KEEP,
+                request
+            )
+            Log.d(TAG, "✅ Periodic backup job scheduled (24h interval, ${FLEX_MINUTES}min flex, KEEP policy)")
+        }
     }
 
     /**

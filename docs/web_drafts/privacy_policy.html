@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - ConsistencyGrid</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0B0E14;
+            --bg-card: rgba(30, 35, 45, 0.4);
+            --stroke: rgba(255, 255, 255, 0.08);
+            --orange-accent: #FF6B35;
+            --rose-accent: #FF4E6E;
+            --text-primary: #FFFFFF;
+            --text-secondary: #9BA3B0;
+            --text-muted: #626A75;
+        }
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-secondary);
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        h1 {
+            color: var(--text-primary);
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #FFF 0%, var(--orange-accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        h2 {
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 32px;
+            border-bottom: 1px solid var(--stroke);
+            padding-bottom: 8px;
+        }
+        p, li {
+            font-size: 1rem;
+            font-weight: 300;
+        }
+        strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--stroke);
+            border-radius: 16px;
+            padding: 24px;
+            margin-top: 24px;
+            backdrop-filter: blur(12px);
+        }
+        .accent-border {
+            border-left: 4px solid var(--orange-accent);
+        }
+        .danger-border {
+            border-left: 4px solid var(--rose-accent);
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--stroke);
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Privacy Policy</h1>
+            <p>Last Updated: June 30, 2026</p>
+        </header>
+
+        <div class="card accent-border">
+            <h2>1. Zero Telemetry & Private-by-Design</h2>
+            <p>At <strong>ConsistencyGrid</strong>, we believe in complete user privacy. The application is designed to function locally as much as possible. We do not collect, monitor, store, upload, or share any personal files, habit text, private screen content, or activities.</p>
+        </div>
+
+        <h2>2. Accessibility Service Declaration (Crucial Disclosure)</h2>
+        <p>Our app features a "Reel Control" option that allows you to voluntarily set time and scroll boundaries for short-form video consumption (e.g., Instagram Reels, YouTube Shorts, Snapchat Spotlight, TikTok).</p>
+        
+        <div class="card danger-border">
+            <strong>How We Use Accessibility API:</strong>
+            <ul>
+                <li><strong>Purpose:</strong> We use Android's Accessibility Service API strictly to count scroll sweeps inside specific short-form video modules and identify when you have exceeded your configured thresholds to show a blocking layout overlay.</li>
+                <li><strong>Strict Scope:</strong> The service is configured via <code>packageNames</code> restrictions to only deliver events from designated applications (Instagram, YouTube, Snapchat, TikTok). All other apps are completely ignored by the system.</li>
+                <li><strong>Zero Data Collection or Sharing:</strong> No screen snapshots, touch points, typed keys, account credentials, or video content are ever recorded, cached, or transmitted to any server. All processing runs 100% locally on your device.</li>
+                <li><strong>Opt-In Control:</strong> This permission is completely optional, disabled by default, and can be activated or revoked by you at any time via Android System Settings.</li>
+            </ul>
+        </div>
+
+        <h2>3. Permissions We Request</h2>
+        <ul>
+            <li><strong>Accessibility Service API:</strong> Used exclusively for scroll detection and limit block overlays inside targeted entertainment apps.</li>
+            <li><strong>System Overlay (Draw Over Other Apps):</strong> Required to show blocking sheets and notifications when scroll boundaries are met.</li>
+            <li><strong>Battery Exemption (Request Ignore Battery Optimizations):</strong> Essential to prevent the OS from killing background wallpaper generation.</li>
+            <li><strong>Exact Alarms (Schedule Exact Alarm):</strong> Required to trigger precise midnight updates for the Consistency Grid wallpaper canvas.</li>
+            <li><strong>Receive Boot Completed:</strong> Used to reschedule update events when you restart your phone.</li>
+        </ul>
+
+        <h2>4. Data Deletion and Safety</h2>
+        <p>ConsistencyGrid supports local data clearing and complete account deletion. You can initiate account deletion inside the app settings under "Danger Zone" or request complete removal online via our <a href="./delete_account.html" style="color: var(--orange-accent);">Account Deletion Request Page</a>. Upon request, all synced data, authentication profiles, and cloud backup packages are permanently deleted immediately.</p>
+
+        <h2>5. Contact Us</h2>
+        <p>If you have any questions or security concerns regarding this policy, please reach out to us at <strong>support@consistencygrid.com</strong>.</p>
+
+        <footer>
+            &copy; 2026 ConsistencyGrid. All rights reserved.
+        </footer>
+    </div>
+</body>
+</html>

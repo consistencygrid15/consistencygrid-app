@@ -101,9 +101,13 @@ class MidnightReceiver : BroadcastReceiver() {
         Log.d(TAG, "[TRIGGER=ALARM] Rescheduling next alarm...")
         ExactAlarmScheduler.scheduleNextMidnightAlarm(context)
 
-        // 3. Enqueue WallpaperWorker
+        // 3. (REMOVED) We no longer launch WallpaperRenderActivity here because background Activity 
+        // launches are strictly prohibited on Android 10+ and fail. The Native Canvas engine 
+        // executing inside the Worker is perfectly capable of rendering the required wallpaper.
+
+        // 4. Enqueue WallpaperWorker as backup / to handle lastUpdateDate marking.
         //    EXPEDITED → bypasses App Standby Buckets & Doze
-        //    KEEP      → if FCM already started a worker, don't spawn a duplicate;
+        //    KEEP      → if Activity already started a worker, don't spawn duplicate
         //                the duplicate-run guard inside doWork() handles day-level dedup
         val workRequest = OneTimeWorkRequestBuilder<WallpaperWorker>()
             .addTag("MIDNIGHT_UPDATE_EXECUTION")
@@ -129,7 +133,7 @@ class MidnightReceiver : BroadcastReceiver() {
 
         WorkManager.getInstance(context).enqueueUniqueWork(
             "WallpaperUpdate_Alarm",
-            if (forceUpdate) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+            if (forceUpdate) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.APPEND_OR_REPLACE,
             workRequest
         )
         Log.d(TAG, "🚀 WallpaperWorker enqueued via WallpaperUpdate_Alarm (force=$forceUpdate)")

@@ -1,3 +1,29 @@
 <resources>
     <string name="app_name">ConsistencyGrid</string>
+    <string name="accessibility_service_description">Reel Control tracks scroll events in Instagram Reels and YouTube Shorts to help you monitor and limit your short-form video consumption. No personal data or content is ever collected or shared.</string>
+
+    <string name="widget_year_title">Year Consistency Grid</string>
+    <string name="widget_year_description">View your consistency across the entire year in a weekly grid format.</string>
+    
+    <string name="widget_month_title">Month Consistency Grid</string>
+    <string name="widget_month_description">View your consistency for the current month in a grid format.</string>
+    
+    <string name="widget_life_title">Life Consistency Grid</string>
+    <string name="widget_life_description">View your consistency relative to your entire life grid (weeks of life).</string>
+    
+    <string name="widget_stats_title">Stats Widget</string>
+    <string name="widget_stats_description">View your current streaks and habit statistics at a glance.</string>
+    
+    <string name="widget_week_agenda_title">Week Agenda Widget</string>
+    <string name="widget_week_agenda_description">View your habit completions and streaks for the current week.</string>
+
+
+    <string name="widget_habit_title">Habit Tracker</string>
+    <string name="widget_habit_description">Tick off your daily habits without opening the app.</string>
+
+    <string name="widget_goal_title">Goal Tracker</string>
+    <string name="widget_goal_description">Track and complete your active goals from the home screen.</string>
+
+    <string name="widget_reminder_title">Reminder Alerts</string>
+    <string name="widget_reminder_description">Dismiss your pending reminders directly from the home screen.</string>
 </resources>

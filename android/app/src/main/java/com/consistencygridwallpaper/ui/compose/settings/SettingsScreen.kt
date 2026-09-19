@@ -21,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -57,7 +58,8 @@ import com.consistencygridwallpaper.utils.PermissionUtils
 @Composable
 fun SettingsScreen(
     onOpenWallpaper: () -> Unit = {},
-    onOpenReelControl: () -> Unit = {}
+    onOpenReelControl: () -> Unit = {},
+    onOpenSubscription: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs   = remember { UserPrefs(context) }
@@ -184,6 +186,14 @@ fun SettingsScreen(
                             prefs.registerAccount(finalEmail, "GOOGLE")
                         }
                         auth.saveAuthData(authResult.token, authResult.sessionToken, authResult.onboarded, authResult.expiresAt)
+                        android.widget.Toast.makeText(context, "Signed in! Syncing data with ConsistencyGrid...", android.widget.Toast.LENGTH_SHORT).show()
+                        withContext(Dispatchers.IO) {
+                            try {
+                                com.consistencygridwallpaper.repository.SyncRepository(context).syncWithServer()
+                            } catch (e: Exception) {
+                                AppLogger.e("SettingsScreen", "Post-login sync error: ${e.message}")
+                            }
+                        }
                     } else {
                         android.widget.Toast.makeText(
                             context,
@@ -207,6 +217,38 @@ fun SettingsScreen(
                     isGoogleSigningIn = false
                 }
             }
+        }
+    }
+
+    var isManualSyncing by remember { mutableStateOf(false) }
+    val infiniteTransition = rememberInfiniteTransition(label = "sync_rotation")
+    val syncRotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "sync_spin"
+    )
+
+    fun triggerManualSync() {
+        if (isManualSyncing) return
+        isManualSyncing = true
+        coroutineScope.launch {
+            val success = withContext(Dispatchers.IO) {
+                try {
+                    com.consistencygridwallpaper.repository.SyncRepository(context).syncWithServer()
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            isManualSyncing = false
+            android.widget.Toast.makeText(
+                context,
+                if (success) "Synced successfully with consistencygrid.com!" else "Sync failed. Check internet connection.",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -373,6 +415,7 @@ fun SettingsScreen(
 
                         Button(
                             onClick = {
+                                if (isGoogleSigningIn) return@Button
                                 googleSignInHelper?.let { helper ->
                                     isGoogleSigningIn = true
                                     googleSignInLauncher.launch(helper.getSignInClient().signInIntent)
@@ -380,6 +423,7 @@ fun SettingsScreen(
                                     context.startActivity(Intent(context, AuthActivity::class.java))
                                 }
                             },
+                            enabled = !isGoogleSigningIn,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(50.dp)
@@ -401,19 +445,34 @@ fun SettingsScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.AccountCircle,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(Modifier.width(10.dp))
-                                    Text(
-                                        text = "Continue with Google",
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color.White
-                                    )
+                                    if (isGoogleSigningIn) {
+                                        CircularProgressIndicator(
+                                            color = Color.White,
+                                            modifier = Modifier.size(20.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(Modifier.width(10.dp))
+                                        Text(
+                                            text = "Connecting to Google…",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Default.AccountCircle,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        Spacer(Modifier.width(10.dp))
+                                        Text(
+                                            text = "Continue with Google",
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color.White
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -430,93 +489,276 @@ fun SettingsScreen(
                         .border(1.dp, GlassStroke, RoundedCornerShape(20.dp))
                         .padding(16.dp)
                 ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    // Avatar with orange gradient ring
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clickable {
-                                photoPickerLauncher.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                )
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(Brush.sweepGradient(listOf(OrangeAccent, Color(0xFFFF4500), OrangeLight, OrangeAccent)))
-                        )
-                        Box(
-                            modifier         = Modifier.size(56.dp).clip(CircleShape).background(BgCard),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val path = profilePhotoPath
-                            if (path != null && File(path).exists()) {
-                                AsyncImage(
-                                    model = File(path),
-                                    contentDescription = "Profile Photo",
-                                    modifier = Modifier.size(50.dp).clip(CircleShape),
-                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                )
-                            } else {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            // Avatar with orange gradient ring
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clickable {
+                                        photoPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Box(
-                                    modifier         = Modifier.size(50.dp).clip(CircleShape).background(OrangeMuted),
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .clip(CircleShape)
+                                        .background(Brush.sweepGradient(listOf(OrangeAccent, Color(0xFFFF4500), OrangeLight, OrangeAccent)))
+                                )
+                                Box(
+                                    modifier         = Modifier.size(56.dp).clip(CircleShape).background(BgCard),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(avatarInitials, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = OrangeAccent)
+                                    val path = profilePhotoPath
+                                    if (path != null && File(path).exists()) {
+                                        AsyncImage(
+                                            model = File(path),
+                                            contentDescription = "Profile Photo",
+                                            modifier = Modifier.size(50.dp).clip(CircleShape),
+                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier         = Modifier.size(50.dp).clip(CircleShape).background(OrangeMuted),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(avatarInitials, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = OrangeAccent)
+                                        }
+                                    }
+                                }
+                                // Camera overlay
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.Black.copy(alpha = 0.6f))
+                                        .align(Alignment.BottomEnd)
+                                        .border(1.dp, Color.White, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CameraAlt,
+                                        contentDescription = "Change Photo",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.width(14.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.clickable {
+                                        editNameInput = displayName
+                                        showEditNameDialog = true
+                                    }
+                                ) {
+                                    Text(displayName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                                    Spacer(Modifier.width(6.dp))
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit Name",
+                                        tint = OrangeAccent.copy(alpha = 0.8f),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                                if (displayEmail.isNotBlank()) {
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(displayEmail, fontSize = 11.sp, color = TextMuted, maxLines = 1)
                                 }
                             }
                         }
-                        // Camera overlay
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.6f))
-                                .align(Alignment.BottomEnd)
-                                .border(1.dp, Color.White, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "Change Photo",
-                                tint = Color.White,
-                                modifier = Modifier.size(11.dp)
-                            )
-                        }
-                    }
 
-                    Spacer(Modifier.width(14.dp))
+                        // ── Dedicated Cloud Sync Status & Manual Sync Bar ──
+                        Spacer(Modifier.height(14.dp))
+                        Divider(color = GlassStroke, thickness = 1.dp)
+                        Spacer(Modifier.height(12.dp))
 
-                    Column(modifier = Modifier.weight(1f)) {
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable {
-                                editNameInput = displayName
-                                showEditNameDialog = true
-                            }
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(displayName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
-                            Spacer(Modifier.width(6.dp))
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "Edit Name",
-                                tint = OrangeAccent.copy(alpha = 0.8f),
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                        if (displayEmail.isNotBlank()) {
-                            Spacer(Modifier.height(2.dp))
-                            Text(displayEmail, fontSize = 11.sp, color = TextMuted, maxLines = 1)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF22C55E).copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudDone,
+                                        contentDescription = null,
+                                        tint = Color(0xFF22C55E),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Spacer(Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "Cloud Sync",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                    Text(
+                                        text = if (isManualSyncing) "Syncing with database..." else "consistencygrid.com",
+                                        fontSize = 11.sp,
+                                        color = TextMuted
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = { triggerManualSync() },
+                                enabled = !isManualSyncing,
+                                modifier = Modifier.height(34.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = OrangeAccent.copy(alpha = 0.15f),
+                                    contentColor = OrangeAccent
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Sync,
+                                        contentDescription = "Sync",
+                                        modifier = Modifier
+                                            .size(15.dp)
+                                            .then(if (isManualSyncing) Modifier.rotate(syncRotation) else Modifier),
+                                        tint = OrangeAccent
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isManualSyncing) "Syncing..." else "Sync Now",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = OrangeAccent
+                                    )
+                                }
+                            }
                         }
                     }
-
                 }
             }
         }
-    }
+
+        // ── Pro / Membership Card ──────────────────────────────────────────
+        item {
+            Spacer(Modifier.height(14.dp))
+            val isProActive = profile.isPremium || prefs.isPro()
+            if (!isProActive) {
+                // High-converting Upgrade to Pro banner
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .shadow(8.dp, RoundedCornerShape(20.dp), spotColor = Color(0xFFFFD700).copy(alpha = 0.35f))
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF2B2002), Color(0xFF191200))
+                            )
+                        )
+                        .border(
+                            BorderStroke(
+                                1.5.dp,
+                                Brush.horizontalGradient(
+                                    listOf(Color(0xFFFFD700), Color(0xFFFF9500))
+                                )
+                            ),
+                            RoundedCornerShape(20.dp)
+                        )
+                        .clickable { onOpenSubscription() }
+                        .padding(18.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.radialGradient(
+                                        listOf(Color(0xFFFFD700).copy(0.25f), Color.Transparent)
+                                    )
+                                )
+                                .border(1.dp, Color(0xFFFFD700).copy(0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("👑", fontSize = 24.sp)
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "Upgrade to Pro",
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color.White
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(Color(0xFFFFD700))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text("PRO", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                                }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Unlock unlimited habits, all themes, custom photo & Life in Weeks",
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.7f),
+                                lineHeight = 16.sp
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = Color(0xFFFFD700)
+                        )
+                    }
+                }
+            } else {
+                // Active Pro status card
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color(0xFF141914))
+                        .border(1.dp, Color(0xFF2E7D32).copy(alpha = 0.6f), RoundedCornerShape(20.dp))
+                        .clickable { onOpenSubscription() }
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("🌟", fontSize = 22.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Consistency Grid Pro Active", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("Unlimited habits, goals & all themes unlocked", fontSize = 12.sp, color = TextSecondary)
+                        }
+                        Text("Manage", fontSize = 13.sp, color = Color(0xFF81C784), fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
 
 
 
@@ -744,7 +986,11 @@ fun SettingsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("v1.0 • Built with ❤️", fontSize = 11.sp, color = TextMuted.copy(alpha = 0.7f))
+                Text(
+                    "v${com.consistencygridwallpaper.BuildConfig.VERSION_NAME} (${com.consistencygridwallpaper.BuildConfig.VERSION_CODE}) • Built with ❤️",
+                    fontSize = 11.sp,
+                    color = TextMuted.copy(alpha = 0.7f)
+                )
             }
         }
     }

@@ -11,6 +11,10 @@
 
     <!-- MAIN APP THEME - Material Design 3 Style -->
     <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <!-- Keep the Compose shell full-screen; the app label must not become a legacy ActionBar. -->
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+
         <!-- Primary Colors -->
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/primary_variant</item>
@@ -35,7 +39,6 @@
         
         <!-- Navigation Bar -->
         <item name="android:navigationBarColor">@color/background</item>
-        <item name="android:windowLightNavigationBar">true</item>
         
         <!-- Edit Text -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
@@ -106,7 +109,6 @@
     <style name="BodyLarge">
         <item name="android:textSize">16sp</item>
         <item name="android:textColor">@color/on_background</item>
-        <item name="android:lineHeight">24sp</item>
     </style>
 
     <style name="BodyMedium">
@@ -126,6 +128,17 @@
     <style name="CaptionSmall">
         <item name="android:textSize">12sp</item>
         <item name="android:textColor">@color/gray_medium</item>
+    </style>
+
+    <!--
+        TRANSPARENT THEME for WallpaperRenderActivity.
+        The Activity has a real Window (so WebView can render) but is completely
+        invisible to the user — no background, no animation, no task entry.
+    -->
+    <style name="Theme.Transparent" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
     </style>
 
 </resources>

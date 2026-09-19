@@ -52,8 +52,6 @@ class AuthActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "AuthActivity"
-        const val MODE_SIGNUP = "SIGNUP"
-        const val MODE_LOGIN = "LOGIN"
     }
 
     private lateinit var googleSignInHelper: GoogleSignInHelper
@@ -77,47 +75,6 @@ class AuthActivity : ComponentActivity() {
         handleGoogleSignInResult(result.data)
     }
 
-    // Email/Password login launcher — opens EmailAuthActivity and handles result
-    private val emailAuthLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            val data = result.data ?: return@registerForActivityResult
-            val token        = data.getStringExtra("token") ?: return@registerForActivityResult
-            val sessionToken = data.getStringExtra("sessionToken") ?: ""
-            val onboarded    = data.getBooleanExtra("onboarded", false)
-            val expiresAt    = data.getLongExtra("expiresAt", 0L)
-            val name         = data.getStringExtra("name") ?: ""
-            val email        = data.getStringExtra("email") ?: ""
-
-            lifecycleScope.launch {
-                if (name.isNotBlank() || email.isNotBlank()) {
-                    withContext(Dispatchers.IO) {
-                        try {
-                            val db = AppDatabase.getDatabase(applicationContext)
-                            val finalEmail = email.ifBlank { "user@consistencygrid.com" }
-                            val finalName  = name.ifBlank { finalEmail.substringBefore("@").replace(".", " ").capitalize() }
-                            val existing   = db.userProfileDao().get()
-                            db.userProfileDao().upsert(
-                                UserProfileEntity(
-                                    id          = 1,
-                                    name        = finalName,
-                                    email       = finalEmail,
-                                    plan        = existing?.plan ?: "free",
-                                    publicToken = token,
-                                    updatedAt   = System.currentTimeMillis()
-                                )
-                            )
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Failed to update profile in AuthActivity: ${e.message}")
-                        }
-                    }
-                }
-                handleAuthSuccess(token = token, sessionToken = sessionToken, onboarded = onboarded, expiresAt = expiresAt)
-            }
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -138,7 +95,6 @@ class AuthActivity : ComponentActivity() {
                     isLoading = isLoggingInState.value,
                     errorMessage = errorMessageState.value,
                     onGoogleSignInClick = { startGoogleSignIn() },
-                    onEmailSignInClick = { startEmailAuth() },
                     onDismissError = { errorMessageState.value = null }
                 )
 
@@ -163,14 +119,6 @@ class AuthActivity : ComponentActivity() {
             isLoggingInState.value = false
             errorMessageState.value = "Unable to launch Google Sign-In: ${e.localizedMessage}"
         }
-    }
-
-    private fun startEmailAuth() {
-        errorMessageState.value = null
-        val intent = Intent(this, EmailAuthActivity::class.java).apply {
-            putExtra("MODE", MODE_LOGIN)
-        }
-        emailAuthLauncher.launch(intent)
     }
 
     private fun handleGoogleSignInResult(data: Intent?) {
@@ -241,6 +189,13 @@ class AuthActivity : ComponentActivity() {
                 pendingExpiresAt    = expiresAt
                 showMigrationDialog.value = true
             } else {
+                withContext(Dispatchers.IO) {
+                    try {
+                        SyncRepository(applicationContext).syncWithServer()
+                    } catch (e: Exception) {
+                        Log.w("AuthActivity", "Initial server sync failed: ${e.message}")
+                    }
+                }
                 navigateToMain()
             }
         }
@@ -309,7 +264,6 @@ private fun AuthScreen(
     isLoading: Boolean,
     errorMessage: String?,
     onGoogleSignInClick: () -> Unit,
-    onEmailSignInClick: () -> Unit,
     onDismissError: () -> Unit
 ) {
     var activeSupportDoc by remember { mutableStateOf<SupportDocType?>(null) }
@@ -521,47 +475,6 @@ private fun AuthScreen(
                                 color = Color(0xFF1F2937)
                             )
                         }
-                    }
-                }
-
-                // ─ OR divider ───────────────────────────────────────
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF3A3A3A))
-                    Text("or", color = TextMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    HorizontalDivider(modifier = Modifier.weight(1f), color = Color(0xFF3A3A3A))
-                }
-
-                // Email / Password Button
-                OutlinedButton(
-                    onClick = onEmailSignInClick,
-                    enabled = !isLoading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.5.dp, Color(0xFF4A4A4A)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Email,
-                            contentDescription = null,
-                            tint = OrangeAccent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = "Continue with Email",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextPrimary
-                        )
                     }
                 }
 

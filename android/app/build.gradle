@@ -11,8 +11,8 @@ android {
         applicationId "com.consistencygridwallpaper"
         minSdkVersion 24
         targetSdkVersion 36
-        versionCode 22
-        versionName "1.5.4"
+        versionCode 25
+        versionName "1.5.7"
     }
 
     signingConfigs {
@@ -64,6 +64,7 @@ android {
     }
 
     buildFeatures {
+        
         buildConfig = true
         compose = true
     }

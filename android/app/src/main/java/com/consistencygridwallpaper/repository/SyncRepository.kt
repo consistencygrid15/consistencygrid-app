@@ -69,38 +69,15 @@ class SyncRepository(private val context: Context) {
         }
         val token = prefs.getToken() ?: run {
             isSyncing.set(false)
-            Log.w(TAG, "No token — skipping sync")
+            Log.w(TAG, "No auth token found in UserPrefs — skipping sync (running in local guest mode)")
             return@withContext false
         }
         Log.d(TAG, "syncWithServer: authenticated sync started")
         try {
 
-            // ── 1. Push offline habit ticks ──────────────────────────────────────
-            val unsyncedLogs = db.habitLogDao().getUnsyncedLogs()
-            val initiallyUnsyncedLogIds = unsyncedLogs.map { it.id }.toSet()
-            if (unsyncedLogs.isNotEmpty()) {
-                try {
-                    val payload = JsonObject()
-                    val logsArr = JsonArray()
-                    unsyncedLogs.forEach { log ->
-                        logsArr.add(JsonObject().apply {
-                            addProperty("habitId", log.habitId)
-                            addProperty("date",    log.date)
-                            addProperty("done",    log.done)
-                        })
-                    }
-                    payload.add("logs", logsArr)
-                    val res = api().syncHabitLogs(payload)
-                    if (res["success"]?.asBoolean == true) {
-                        db.habitLogDao().markLogsSynced(unsyncedLogs.map { it.id })
-                        Log.d(TAG, "Pushed ${unsyncedLogs.size} offline ticks")
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Habit tick push failed (non-fatal): ${e.message}")
-                }
-            }
-
-            // ── 1.5 Push unsynced habits (creates, edits, soft-deletes) ──────────
+            // ── 1. Push unsynced habits FIRST (creates, edits, soft-deletes) ──
+            // Must precede habit ticks so newly created habits have a valid serverId
+            // before ticks referencing them are pushed to the backend database.
             val unsyncedHabits = db.habitDao().getUnsyncedHabits()
             if (unsyncedHabits.isNotEmpty()) {
                 val upsertsArr = JsonArray()
@@ -131,15 +108,17 @@ class SyncRepository(private val context: Context) {
                             val localId  = obj["localId"].asString
                             val serverId = obj["serverId"]?.takeIf { !it.isJsonNull }?.asString
                             val status   = obj["status"].asString
-                            if (status == "created" && localId != serverId) {
+                            if (status == "created" && localId != serverId && serverId != null) {
                                 // Server assigned a real cuid — seamlessly replace the local placeholder row
                                 val localHabit = db.habitDao().getHabitById(localId)
-                                if (localHabit != null && serverId != null) {
+                                if (localHabit != null) {
                                     db.habitDao().insertHabits(listOf(localHabit.copy(
                                         id = serverId,
                                         serverId = serverId,
                                         isSynced = true
                                     )))
+                                    // Update existing habit logs that were recorded with localId
+                                    db.habitLogDao().updateHabitIdForLogs(localId, serverId)
                                 }
                                 db.habitDao().deleteHabitById(localId)
                             } else {
@@ -150,10 +129,40 @@ class SyncRepository(private val context: Context) {
                         unsyncedHabits.filter { it.isDeleted && it.serverId == null }.forEach {
                             db.habitDao().markHabitsSynced(listOf(it.id))
                         }
-                        Log.d(TAG, "Pushed ${upsertsArr.size()} habits, ${deletesArr.size()} deletes")
+                        Log.d(TAG, "Pushed ${upsertsArr.size()} habits, ${deletesArr.size()} deletes to remote database")
+                    } else {
+                        Log.w(TAG, "Habit push returned non-success: $res")
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Habit push failed (non-fatal): ${e.message}")
+                }
+            }
+
+            // ── 1.5 Push offline habit ticks ─────────────────────────────────────
+            // Now all habitIds in habitLogDao reflect server-assigned cuid
+            val unsyncedLogs = db.habitLogDao().getUnsyncedLogs()
+            val initiallyUnsyncedLogIds = unsyncedLogs.map { it.id }.toSet()
+            if (unsyncedLogs.isNotEmpty()) {
+                try {
+                    val payload = JsonObject()
+                    val logsArr = JsonArray()
+                    unsyncedLogs.forEach { log ->
+                        logsArr.add(JsonObject().apply {
+                            addProperty("habitId", log.habitId)
+                            addProperty("date",    log.date)
+                            addProperty("done",    log.done)
+                        })
+                    }
+                    payload.add("logs", logsArr)
+                    val res = api().syncHabitLogs(payload)
+                    if (res["success"]?.asBoolean == true) {
+                        db.habitLogDao().markLogsSynced(unsyncedLogs.map { it.id })
+                        Log.d(TAG, "Pushed ${unsyncedLogs.size} offline ticks to remote database")
+                    } else {
+                        Log.w(TAG, "Habit tick push returned non-success: $res")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Habit tick push failed (non-fatal): ${e.message}")
                 }
             }
 
@@ -322,7 +331,8 @@ class SyncRepository(private val context: Context) {
             val deviceDate   = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
             val url          = "$baseUrl/api/wallpaper-data" +
                                "?tz=${java.net.URLEncoder.encode(tz, "UTF-8")}" +
-                               "&deviceDate=$deviceDate"
+                               "&deviceDate=$deviceDate" +
+                               "&token=${java.net.URLEncoder.encode(token, "UTF-8")}"
             Log.d(TAG, "Fetching wallpaper-data for date=$deviceDate, tz=$tz")
 
             val request  = Request.Builder()
@@ -374,13 +384,17 @@ class SyncRepository(private val context: Context) {
             val existingProfile = db.userProfileDao().get()
             val finalName  = userName.ifBlank { existingProfile?.name ?: "" }
             val finalEmail = userEmail.ifBlank { existingProfile?.email ?: "" }
+            val isProLocally = prefs.isPro()
+            val effectivePlan = if (isProLocally && userPlan == "free") (prefs.getProPlan() ?: "pro_monthly") else userPlan
+            val effectivePremium = (userPlan != "free") || isProLocally
+
             db.userProfileDao().upsert(
                 UserProfileEntity(
                     id              = 1,
                     name            = finalName,
                     email           = finalEmail,
-                    plan            = userPlan,
-                    isPremium       = userPlan != "free",
+                    plan            = effectivePlan,
+                    isPremium       = effectivePremium,
                     currentStreak   = if (streak > 0) streak else (existingProfile?.currentStreak ?: 0),
                     totalHabits     = if (totalHabits > 0) totalHabits else (existingProfile?.totalHabits ?: 0),
                     todayCompletion = todayPct,
@@ -458,7 +472,15 @@ class SyncRepository(private val context: Context) {
                     if (unsyncedLocalIds.isNotEmpty())
                         Log.d(TAG, "Protecting ${unsyncedLocalIds.size} locally unsynced goal(s) from server overwrite")
 
-                    val goalsArr     = JsonParser.parseString(goalsBody).asJsonArray
+                    val parsedGoals = JsonParser.parseString(goalsBody)
+                    val goalsArr = when {
+                        parsedGoals.isJsonArray -> parsedGoals.asJsonArray
+                        parsedGoals.isJsonObject && parsedGoals.asJsonObject.has("goals") && parsedGoals.asJsonObject.get("goals").isJsonArray ->
+                            parsedGoals.asJsonObject.getAsJsonArray("goals")
+                        parsedGoals.isJsonObject && parsedGoals.asJsonObject.has("data") && parsedGoals.asJsonObject.get("data").isJsonArray ->
+                            parsedGoals.asJsonObject.getAsJsonArray("data")
+                        else -> JsonArray()
+                    }
                     val goalsEntities = goalsArr.mapNotNull { elem ->
                         runCatching {
                             val g   = elem.asJsonObject

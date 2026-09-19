@@ -43,6 +43,18 @@ class UserPrefs(context: Context) {
         const val KEY_UPDATE_HOUR = "update_hour"
         const val KEY_UPDATE_MINUTE = "update_minute"
         const val KEY_UPDATE_IN_PROGRESS = "update_in_progress"
+        const val KEY_WALLPAPER_UPDATE_MODE = "wallpaper_update_mode"
+        const val KEY_PROFILE_PHOTO_PATH = "profile_photo_path"
+        const val KEY_WALLPAPER_SETTINGS = "wallpaper_settings"
+
+        // ── Subscription / Pro Status ──────────────────────────────────────────
+        const val KEY_IS_PRO               = "is_pro"
+        const val KEY_PRO_PLAN             = "pro_plan"           // "pro_monthly" | "pro_yearly"
+        const val KEY_PRO_EXPIRES_AT       = "pro_expires_at_ms"  // Unix ms
+        const val KEY_PRO_PURCHASE_TOKEN   = "pro_purchase_token"
+
+        const val UPDATE_MODE_WALLPAPER_AND_WIDGETS = "WALLPAPER_AND_WIDGETS"
+        const val UPDATE_MODE_WIDGETS_ONLY = "WIDGETS_ONLY"
         
         // Defaults
         private const val DEFAULT_THEME_COLOR = "#FF7A00" // Orange
@@ -375,5 +387,127 @@ class UserPrefs(context: Context) {
      */
     fun isUpdateInProgress(): Boolean {
         return prefs.getBoolean(KEY_UPDATE_IN_PROGRESS, false)
+    }
+
+    fun getBoolean(key: String, defaultValue: Boolean = false): Boolean {
+        return prefs.getBoolean(key, defaultValue)
+    }
+
+    fun setBoolean(key: String, value: Boolean) {
+        prefs.edit().putBoolean(key, value).apply()
+    }
+
+    // ─── Native App Helpers ───────────────────────────────────────────────────
+
+    fun getCurrentStreak(): Int = prefs.getInt("current_streak", 0)
+    fun setCurrentStreak(streak: Int) { prefs.edit().putInt("current_streak", streak).apply() }
+
+    fun getDaysTracked(): Int = prefs.getInt("days_tracked", 0)
+    fun setDaysTracked(days: Int) { prefs.edit().putInt("days_tracked", days).apply() }
+
+    // ─── Wallpaper Update Mode ────────────────────────────────────────────────
+
+    /**
+     * Sets the wallpaper update behaviour.
+     */
+    fun setWallpaperUpdateMode(mode: String) {
+        val safe = if (mode == UPDATE_MODE_WIDGETS_ONLY) UPDATE_MODE_WIDGETS_ONLY
+                   else UPDATE_MODE_WALLPAPER_AND_WIDGETS
+        prefs.edit().putString(KEY_WALLPAPER_UPDATE_MODE, safe).apply()
+    }
+
+    /**
+     * Returns the wallpaper update behaviour.
+     * DEFAULT is WALLPAPER_AND_WIDGETS — wallpaper updates on fresh install.
+     */
+    fun getWallpaperUpdateMode(): String {
+        return prefs.getString(KEY_WALLPAPER_UPDATE_MODE, UPDATE_MODE_WALLPAPER_AND_WIDGETS)
+            ?: UPDATE_MODE_WALLPAPER_AND_WIDGETS
+    }
+
+    /** True only if user explicitly chose Widgets-Only mode. */
+    fun isWidgetsOnlyMode(): Boolean = getWallpaperUpdateMode() == UPDATE_MODE_WIDGETS_ONLY
+
+    // ─── Profile Photo ────────────────────────────────────────────────────────
+    fun getProfilePhotoPath(): String? = prefs.getString(KEY_PROFILE_PHOTO_PATH, null)
+    fun setProfilePhotoPath(path: String?) {
+        if (path == null) {
+            prefs.edit().remove(KEY_PROFILE_PHOTO_PATH).apply()
+        } else {
+            prefs.edit().putString(KEY_PROFILE_PHOTO_PATH, path).apply()
+        }
+    }
+
+    // ─── Wallpaper Settings JSON ──────────────────────────────────────────────
+    fun getWallpaperSettings(): String? = prefs.getString(KEY_WALLPAPER_SETTINGS, null)
+    fun saveWallpaperSettings(json: String) {
+        prefs.edit().putString(KEY_WALLPAPER_SETTINGS, json).apply()
+    }
+
+    // ─── Registered Accounts Tracking ─────────────────────────────────────────
+
+    fun getRegisteredProvider(email: String): String? {
+        val cleanEmail = email.trim().lowercase()
+        return prefs.getString("registered_account_provider_$cleanEmail", null)
+    }
+
+    fun registerAccount(email: String, provider: String) {
+        val cleanEmail = email.trim().lowercase()
+        if (cleanEmail.isNotBlank()) {
+            prefs.edit().putString("registered_account_provider_$cleanEmail", provider).apply()
+        }
+    }
+
+    // ─── Pro Subscription Status ──────────────────────────────────────────────
+
+    /**
+     * Saves the user's Pro subscription status after server verification.
+     *
+     * @param isPro     True if subscription is active
+     * @param plan      "pro_monthly" or "pro_yearly"
+     * @param expiresAt Unix timestamp (ms) when subscription expires
+     * @param token     Google Play purchase token for future verification
+     */
+    fun setProStatus(isPro: Boolean, plan: String, expiresAt: Long, token: String) {
+        prefs.edit()
+            .putBoolean(KEY_IS_PRO, isPro)
+            .putString(KEY_PRO_PLAN, plan)
+            .putLong(KEY_PRO_EXPIRES_AT, expiresAt)
+            .putString(KEY_PRO_PURCHASE_TOKEN, token)
+            .apply()
+    }
+
+    /**
+     * Returns true if the user has an active Pro subscription.
+     * Also checks expiry — if expired, returns false (subscription lapsed).
+     */
+    fun isPro(): Boolean {
+        val stored = prefs.getBoolean(KEY_IS_PRO, false)
+        if (!stored) return false
+        val expiresAt = prefs.getLong(KEY_PRO_EXPIRES_AT, 0L)
+        // If expiry is 0 (not set), trust the stored flag (e.g. lifetime plan)
+        if (expiresAt == 0L) return true
+        return System.currentTimeMillis() < expiresAt
+    }
+
+    /** Returns the active plan ID, e.g. "pro_monthly" or "pro_yearly" */
+    fun getProPlan(): String? = prefs.getString(KEY_PRO_PLAN, null)
+
+    /** Returns the Unix timestamp (ms) when the Pro subscription expires. */
+    fun getProExpiresAt(): Long = prefs.getLong(KEY_PRO_EXPIRES_AT, 0L)
+
+    /** Returns the stored Google Play purchase token. */
+    fun getProPurchaseToken(): String? = prefs.getString(KEY_PRO_PURCHASE_TOKEN, null)
+
+    /**
+     * Clears Pro status — called when subscription is cancelled or expires.
+     */
+    fun clearProStatus() {
+        prefs.edit()
+            .putBoolean(KEY_IS_PRO, false)
+            .remove(KEY_PRO_PLAN)
+            .putLong(KEY_PRO_EXPIRES_AT, 0L)
+            .remove(KEY_PRO_PURCHASE_TOKEN)
+            .apply()
     }
 }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Reel Control Accessibility Service Configuration.
+    packageNames is now explicitly set so Android only delivers events for
+    the tracked apps — reduces CPU usage and makes detection more reliable.
+    canRequestFilterKeyEvents + canRequestEnhancedWebAccessibility disabled
+    intentionally (privacy-preserving).
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/accessibility_service_description"
+    android:accessibilityEventTypes="typeViewScrolled|typeWindowContentChanged|typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
+    android:canRetrieveWindowContent="true"
+    android:packageNames="com.instagram.android,com.google.android.youtube"
+    android:notificationTimeout="50" />

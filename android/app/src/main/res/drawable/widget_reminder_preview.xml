@@ -1,0 +1,36 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="250dp"
+    android:height="110dp"
+    android:viewportWidth="250"
+    android:viewportHeight="110">
+    <path android:fillColor="#1C1C1E"
+        android:pathData="M8,0 L242,0 Q250,0 250,8 L250,102 Q250,110 242,110 L8,110 Q0,110 0,102 L0,8 Q0,0 8,0 Z"/>
+    <!-- Sky blue header -->
+    <path android:fillColor="#0284C7"
+        android:pathData="M14,14 L90,14 Q92,14 92,16 L92,20 Q92,22 90,22 L14,22 Q12,22 12,20 L12,16 Q12,14 14,14 Z"/>
+    <path android:fillColor="#0284C740"
+        android:pathData="M12,26 L238,26 L238,27 L12,27 Z"/>
+    <!-- Reminder row 1 -->
+    <path android:fillColor="#0284C7" android:pathData="M12,33 L15,33 L15,43 L12,43 Z"/>
+    <path android:strokeColor="#777777" android:strokeWidth="1.5"
+        android:pathData="M18,35 Q16,35 16,37 L16,41 Q16,43 18,43 L20,43 Q22,43 22,41 L22,37 Q22,35 20,35 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M25,37 L150,37 Q151,37 151,38.5 Q151,40 150,40 L25,40 Q24,40 24,38.5 Q24,37 25,37 Z"/>
+    <path android:fillColor="#0284C7" android:pathData="M25,41 L90,41 Q91,41 91,42 Q91,43 90,43 L25,43 Q24,43 24,42 Q24,41 25,41 Z"/>
+    <!-- Bell icon shape simplified -->
+    <path android:fillColor="#0284C7"
+        android:pathData="M200,35 Q200,33 202,33 Q204,33 204,35 L205,40 L199,40 Z"/>
+    <path android:fillColor="#0284C7"
+        android:pathData="M199,40 L205,40 L205,41 Q202,43 199,41 Z"/>
+    <!-- Reminder row 2 -->
+    <path android:fillColor="#0284C7" android:pathData="M12,48 L15,48 L15,58 L12,58 Z"/>
+    <path android:strokeColor="#777777" android:strokeWidth="1.5"
+        android:pathData="M18,50 Q16,50 16,52 L16,56 Q16,58 18,58 L20,58 Q22,58 22,56 L22,52 Q22,50 20,50 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M25,52 L130,52 Q131,52 131,53.5 Q131,55 130,55 L25,55 Q24,55 24,53.5 Q24,52 25,52 Z"/>
+    <path android:fillColor="#0284C7" android:pathData="M25,56 L80,56 Q81,56 81,57 Q81,58 80,58 L25,58 Q24,58 24,57 Q24,56 25,56 Z"/>
+    <!-- Reminder row 3 -->
+    <path android:fillColor="#0284C7" android:pathData="M12,63 L15,63 L15,73 L12,73 Z"/>
+    <path android:strokeColor="#777777" android:strokeWidth="1.5"
+        android:pathData="M18,65 Q16,65 16,67 L16,71 Q16,73 18,73 L20,73 Q22,73 22,71 L22,67 Q22,65 20,65 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M25,67 L110,67 Q111,67 111,68.5 Q111,70 110,70 L25,70 Q24,70 24,68.5 Q24,67 25,67 Z"/>
+    <path android:fillColor="#0284C7" android:pathData="M25,71 L70,71 Q71,71 71,72 Q71,73 70,73 L25,73 Q24,73 24,72 Q24,71 25,71 Z"/>
+</vector>

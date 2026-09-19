@@ -1,6 +1,6 @@
 {
   "name": "ConsistencyGridWallpaper",
-  "version": "0.0.1",
+  "version": "1.5.7",
   "private": true,
   "scripts": {
     "android": "react-native run-android",

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Account Deletion - ConsistencyGrid</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0B0E14;
+            --bg-card: rgba(30, 35, 45, 0.4);
+            --stroke: rgba(255, 255, 255, 0.08);
+            --orange-accent: #FF6B35;
+            --rose-accent: #FF4E6E;
+            --text-primary: #FFFFFF;
+            --text-secondary: #9BA3B0;
+            --text-muted: #626A75;
+        }
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-secondary);
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        h1 {
+            color: var(--text-primary);
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #FFF 0%, var(--rose-accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        p {
+            font-size: 1rem;
+            font-weight: 300;
+        }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--stroke);
+            border-radius: 16px;
+            padding: 28px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 8px;
+        }
+        input[type="email"], select, textarea {
+            width: 100%;
+            padding: 12px;
+            background: rgba(15, 18, 26, 0.8);
+            border: 1px solid var(--stroke);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 1rem;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="email"]:focus, select:focus, textarea:focus {
+            border-color: var(--rose-accent);
+        }
+        .warning-text {
+            color: var(--rose-accent);
+            font-size: 0.85rem;
+            margin-top: 4px;
+            font-weight: 400;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--rose-accent) 0%, #D81B60 100%);
+            border: none;
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 78, 110, 0.3);
+            transition: opacity 0.2s;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .alert {
+            display: none;
+            padding: 14px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+        }
+        .alert-success {
+            display: block;
+            background: rgba(76, 175, 80, 0.15);
+            border: 1px solid #4CAF50;
+            color: #4CAF50;
+        }
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--stroke);
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Request Account Deletion</h1>
+            <p>We are sorry to see you go. Submit your request below to remove your user profile and all cloud sync records.</p>
+        </header>
+
+        <div class="card">
+            <div id="successMessage" class="alert alert-success" style="display: none;">
+                <strong>Success!</strong> Your account deletion request has been submitted. All data associated with this email will be purged within 48 hours.
+            </div>
+
+            <form id="deletionForm" onsubmit="handleSubmit(event)">
+                <div class="form-group">
+                    <label for="email">Account Email Address</label>
+                    <input type="email" id="email" required placeholder="name@example.com">
+                    <p class="warning-text">⚠️ This must match the email you used to register in the ConsistencyGrid app.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="reason">Why are you deleting your account? (Optional)</label>
+                    <select id="reason">
+                        <option value="">Select a reason</option>
+                        <option value="no-longer-use">I don't use this app anymore</option>
+                        <option value="privacy">Privacy concerns</option>
+                        <option value="bugs">Encountered technical issues</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmation">
+                        <input type="checkbox" id="confirmation" required style="margin-right: 8px; transform: scale(1.1);">
+                        I understand that this action is irreversible and all data will be permanently wiped.
+                    </label>
+                </div>
+
+                <button type="submit">Submit Deletion Request</button>
+            </form>
+        </div>
+
+        <script>
+            function handleSubmit(e) {
+                e.preventDefault();
+                // Simulating database request delivery
+                document.getElementById('deletionForm').style.display = 'none';
+                document.getElementById('successMessage').style.display = 'block';
+            }
+        </script>
+
+        <footer>
+            &copy; 2026 ConsistencyGrid. All rights reserved.
+        </footer>
+    </div>
+</body>
+</html>

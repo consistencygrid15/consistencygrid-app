@@ -1,6 +1,5 @@
-﻿import React, { useEffect } from "react";
-import { Linking, AsyncStorage } from "react-native";
-import HomeScreen from "./src/screens/HomeScreen";
+import React, { useEffect } from "react";
+import { Linking, View, Text, StyleSheet } from "react-native";
 
 export default function App() {
   useEffect(() => {
@@ -23,48 +22,48 @@ export default function App() {
 
   const handleDeepLink = ({ url }) => {
     console.log("[DeepLink] Received:", url);
-    
-    // Check if it's payment success link
-    if (!url.includes("consistencygrid://payment-success")) {
+    if (!url || !url.includes("consistencygrid://")) {
       return;
     }
 
-    // Extract query parameters
     const params = {};
     const queryString = url.split("?")?.[1];
-    
     if (queryString) {
       queryString.split("&").forEach((pair) => {
         const [key, value] = pair.split("=");
-        params[decodeURIComponent(key)] = decodeURIComponent(value);
+        if (key) {
+          params[decodeURIComponent(key)] = value ? decodeURIComponent(value) : "";
+        }
       });
     }
 
-    console.log("[DeepLink] Parsed params:", {
-      plan: params.plan,
-      hasToken: !!params.token,
-    });
-
-    // Save subscription token
-    if (params.token) {
-      try {
-        AsyncStorage.multiSet([
-          ["subscription_token", params.token],
-          ["user_plan", params.plan || "pro_yearly"],
-          ["subscription_status", "active"],
-          ["is_premium", "true"],
-          [
-            "subscription_expiry",
-            params.expiryDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-          ],
-        ]);
-        
-        console.log("[DeepLink]  Subscription saved successfully");
-      } catch (error) {
-        console.error("[DeepLink] Error saving subscription:", error);
-      }
-    }
+    console.log("[DeepLink] Parsed params:", params);
   };
 
-  return <HomeScreen />;
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Consistency Grid Native App</Text>
+      <Text style={styles.subtitle}>Native Kotlin & Jetpack Compose Active</Text>
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#0A0A0C",
+  },
+  title: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  subtitle: {
+    color: "#8E8E93",
+    fontSize: 14,
+    marginTop: 8,
+  },
+});
+

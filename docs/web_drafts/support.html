@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support & FAQ - ConsistencyGrid</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0B0E14;
+            --bg-card: rgba(30, 35, 45, 0.4);
+            --stroke: rgba(255, 255, 255, 0.08);
+            --orange-accent: #FF6B35;
+            --text-primary: #FFFFFF;
+            --text-secondary: #9BA3B0;
+            --text-muted: #626A75;
+        }
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-secondary);
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        h1 {
+            color: var(--text-primary);
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #FFF 0%, var(--orange-accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        h2 {
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 32px;
+            border-bottom: 1px solid var(--stroke);
+            padding-bottom: 8px;
+        }
+        p, li {
+            font-size: 1rem;
+            font-weight: 300;
+        }
+        strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        .faq-item {
+            background: var(--bg-card);
+            border: 1px solid var(--stroke);
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 16px;
+            backdrop-filter: blur(12px);
+        }
+        .faq-question {
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0 0 10px 0;
+        }
+        .faq-answer {
+            margin: 0;
+        }
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--stroke);
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Support & FAQ</h1>
+            <p>Need help setting up or customizing ConsistencyGrid? We got you covered.</p>
+        </header>
+
+        <h2>Frequently Asked Questions</h2>
+
+        <div class="faq-item">
+            <h3 class="faq-question">1. Why does ConsistencyGrid require Accessibility Permission?</h3>
+            <p class="faq-answer">This permission is required <strong>only</strong> if you enable our digital well-being features ("Reel Control"). It allows our app to measure vertical scroll sweeps inside Instagram, YouTube, Snapchat, or TikTok to check if you've crossed your video boundaries. We do not gather, record, or upload any personal data.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3 class="faq-question">2. My wallpaper stopped updating. How do I fix it?</h3>
+            <p class="faq-answer">Aggressive battery management software on OEM devices (especially Xiaomi, OnePlus, Samsung, and Huawei) may occasionally stop background generators. To resolve this:
+                <br>• Open ConsistencyGrid Settings → Look at <strong>OEM Autostart Settings</strong> and toggle it on.
+                <br>• Disable battery optimization for ConsistencyGrid (set to "Unrestricted" in app info).
+            </p>
+        </div>
+
+        <div class="faq-item">
+            <h3 class="faq-question">3. How do I delete my account?</h3>
+            <p class="faq-answer">You can easily delete your account and all associated backups:
+                <br>• <strong>In-App:</strong> Go to settings, scroll down to "Account" and tap <strong>Delete Account</strong>.
+                <br>• <strong>Web Portal:</strong> Submit an email request via our <a href="./delete_account.html" style="color: var(--orange-accent);">Account Deletion Form</a>.
+            </p>
+        </div>
+
+        <h2>Contact Support</h2>
+        <p>If you're facing other issues, please drop us an email with details of your device model, OS version, and a brief description of the issue:</p>
+        <p>📨 Email: <a href="mailto:support@consistencygrid.com" style="color: var(--orange-accent); font-weight: 600;">support@consistencygrid.com</a></p>
+
+        <footer>
+            &copy; 2026 ConsistencyGrid. All rights reserved.
+        </footer>
+    </div>
+</body>
+</html>

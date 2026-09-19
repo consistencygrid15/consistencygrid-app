@@ -1,6 +1,6 @@
 package com.consistencygridwallpaper.workers
 
-import android.util.Log
+import com.consistencygridwallpaper.utils.AppLogger
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
@@ -26,20 +26,19 @@ class WallpaperMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        Log.d(TAG, "Refreshed token: $token")
+        // Security: do not log the full raw FCM registration token
+        AppLogger.d(TAG, "Refreshed token: [REDACTED]")
         sendRegistrationToServer(token)
     }
 
     private fun sendRegistrationToServer(token: String) {
-        // We need to send this to Next.js API
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Get the base token/session from userPrefs to authenticate the API call
                 val userPrefs = com.consistencygridwallpaper.storage.UserPrefs(applicationContext)
                 val userToken = userPrefs.getToken()
                 
                 if (userToken.isNullOrEmpty()) {
-                     Log.w(TAG, "No user token available to sync FCM token")
+                     AppLogger.w(TAG, "No user token available to sync FCM token")
                      return@launch
                 }
 
@@ -55,21 +54,22 @@ class WallpaperMessagingService : FirebaseMessagingService() {
 
                 val body = json.toString().toRequestBody("application/json".toMediaType())
                 
-                // Add exact cookies required by getUniversalSession
+                // Add Authorization Bearer header + Cookie auth
                 val request = Request.Builder()
                     .url("$baseUrl/api/device-token")
                     .post(body)
+                    .addHeader("Authorization", "Bearer $userToken")
                     .addHeader("Cookie", "publicToken=$userToken; native_auth=true")
                     .build()
 
                 val response = client.newCall(request).execute()
                 if (response.isSuccessful) {
-                    Log.d(TAG, "Successfully synced FCM token to server")
+                    AppLogger.d(TAG, "Successfully synced FCM token to server")
                 } else {
-                    Log.e(TAG, "Failed to sync FCM token: ${response.code}")
+                    AppLogger.e(TAG, "Failed to sync FCM token: ${response.code}")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error syncing FCM token", e)
+                AppLogger.e(TAG, "Error syncing FCM token", e)
             }
         }
     }
@@ -77,36 +77,28 @@ class WallpaperMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         val receivedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
             .format(java.util.Date())
-        Log.d(TAG, "[TRIGGER=FCM] 📩 Message received at $receivedAt from: ${remoteMessage.from}")
+        AppLogger.d(TAG, "[TRIGGER=FCM] 📩 Message received at $receivedAt")
 
-        // Check if message contains a data payload.
         if (remoteMessage.data.isNotEmpty()) {
-            Log.d(TAG, "[TRIGGER=FCM] Data payload: ${remoteMessage.data}")
-
             val type = remoteMessage.data["type"]
             if (type == "WALLPAPER_UPDATE_TRIGGER") {
-                Log.d(TAG, "[TRIGGER=FCM] Wallpaper update requested — preparing worker...")
+                val jitterMax = remoteMessage.data["jitter_max_minutes"]?.toIntOrNull() ?: 60
+                val isInstantUpdate = (jitterMax == 0)
+                val triggerName = if (isInstantUpdate) "FCM_INSTANT" else "FCM"
 
-                // ── Fix 3.1: Acquire WakeLock ──────────────────────────────────────
-                // Without this, the CPU can sleep between onMessageReceived() returning
-                // and WorkManager actually starting the coroutine in Doze mode.
-                // MidnightReceiver.acquireWakeLock() is idempotent and will be released
-                // by WallpaperWorker.doWork() in its finally block.
+                AppLogger.d(TAG, "[TRIGGER=$triggerName] Wallpaper update requested — isInstant=$isInstantUpdate")
+
                 MidnightReceiver.acquireWakeLock(applicationContext)
-                Log.d(TAG, "[TRIGGER=FCM] 🔒 WakeLock acquired")
+                AppLogger.d(TAG, "[TRIGGER=$triggerName] 🔒 WakeLock acquired")
 
-                // ── Fix 3.2: Always reschedule next alarm ──────────────────────────
-                // If FCM is the sole executor tonight (e.g. alarm was cancelled/revoked),
-                // the alarm chain must still be restored for tomorrow.
-                Log.d(TAG, "[TRIGGER=FCM] Rescheduling next alarm to ensure chain continuity...")
+                AppLogger.d(TAG, "[TRIGGER=$triggerName] Rescheduling next alarm to ensure chain continuity...")
                 ExactAlarmScheduler.scheduleNextMidnightAlarm(applicationContext)
-
-                Log.d(TAG, "[TRIGGER=FCM] 🚀 Removing client-side jitter delay to bypass Doze authentically")
 
                 val workRequest = OneTimeWorkRequestBuilder<WallpaperWorker>()
                     .setInputData(
                         androidx.work.Data.Builder()
-                            .putString("TRIGGER", "FCM")
+                            .putString("TRIGGER", triggerName)
+                            .putBoolean("FORCE_UPDATE", isInstantUpdate)
                             .build()
                     )
                     .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
@@ -117,12 +109,13 @@ class WallpaperMessagingService : FirebaseMessagingService() {
                     )
                     .build()
 
+                val queueName = if (isInstantUpdate) "WallpaperUpdate_FCM_Instant" else "WallpaperUpdate_FCM"
                 WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-                    "WallpaperUpdate_FCM", // Split queue name prevents collision with AlarmManager
-                    ExistingWorkPolicy.KEEP,
+                    queueName,
+                    ExistingWorkPolicy.REPLACE,
                     workRequest
                 )
-                Log.d(TAG, "[TRIGGER=FCM] 🚀 WallpaperWorker expedited immediately via WallpaperUpdate_FCM")
+                AppLogger.d(TAG, "[TRIGGER=$triggerName] 🚀 WallpaperWorker enqueued via $queueName (force=$isInstantUpdate)")
             }
         }
     }

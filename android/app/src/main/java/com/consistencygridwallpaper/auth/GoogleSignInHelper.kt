@@ -1,7 +1,6 @@
 package com.consistencygridwallpaper.auth
 
 import android.app.Activity
-import android.util.Log
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
@@ -16,6 +15,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import com.consistencygridwallpaper.utils.AppLogger
 
 /**
  * GoogleSignInHelper - Wrapper for Google Sign-In SDK
@@ -27,18 +27,23 @@ class GoogleSignInHelper(private val activity: Activity) {
 
     companion object {
         private const val TAG = "GoogleSignInHelper"
-        
-        // TODO: Replace with your actual Web Application Client ID from Google Cloud Console
+
+        // Must match the Web OAuth client used by the native-auth backend.
         private const val SERVER_CLIENT_ID = "44748701600-4sm76hqagnjrd097i4jvt1i72itm9bcu.apps.googleusercontent.com"
         
         private const val BACKEND_URL = "https://consistencygrid.com/api/auth/native/google"
+        private const val FALLBACK_URL = "https://consistencygrid.com/api/native-auth/google"
         private const val TIMEOUT_SECONDS = 30L
     }
 
     private val googleSignInClient: GoogleSignInClient
 
+    @Volatile
+    var lastErrorMessage: String? = null
+        private set
+
     init {
-        // Configure Google Sign-In
+        // Request the backend audience so the returned ID token can be verified server-side.
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(SERVER_CLIENT_ID)
             .requestEmail()
@@ -66,100 +71,127 @@ class GoogleSignInHelper(private val activity: Activity) {
     suspend fun handleSignInResult(task: Task<GoogleSignInAccount>): AuthResult? {
         return withContext(Dispatchers.IO) {
             try {
+                lastErrorMessage = null
                 // Get signed-in account
                 val account = task.getResult(ApiException::class.java)
                 val idToken = account?.idToken
 
-                if (idToken == null) {
-                    Log.e(TAG, "ID token is null")
+                val googleName  = account?.displayName ?: ""
+                val googleEmail = account?.email ?: ""
+
+                if (googleEmail.isBlank()) {
+                    lastErrorMessage = "Google did not return an email address. Please try again."
+                    AppLogger.e(TAG, "Google account returned no email")
                     return@withContext null
                 }
 
-                Log.d(TAG, "Got ID token, verifying with backend")
+                if (idToken.isNullOrBlank()) {
+                    lastErrorMessage = "Google did not return a sign-in token. Please try again."
+                    AppLogger.e(TAG, "Google sign-in returned no ID token")
+                    return@withContext null
+                }
 
-                // Verify with backend
-                verifyWithBackend(idToken)
+                // Authentication is server-authoritative. Never create a local token when
+                // backend verification fails because that token cannot authorize API calls.
+                val backendResult = verifyWithBackend(idToken)
+                if (backendResult == null) {
+                    if (lastErrorMessage.isNullOrBlank()) {
+                        lastErrorMessage = "Could not verify your Google account. Check your connection and try again."
+                    }
+                    return@withContext null
+                }
 
+                val finalName = backendResult.name.ifBlank { googleName }
+                val finalEmail = backendResult.email.ifBlank { googleEmail }
+                AuthResult(
+                    token = backendResult.token,
+                    sessionToken = backendResult.sessionToken,
+                    onboarded = backendResult.onboarded,
+                    expiresAt = backendResult.expiresAt,
+                    name = finalName,
+                    email = finalEmail
+                )
             } catch (e: ApiException) {
                 val errorMsg = when (e.statusCode) {
                     com.google.android.gms.common.api.CommonStatusCodes.CANCELED -> "Sign-in cancelled by user"
                     com.google.android.gms.common.api.CommonStatusCodes.NETWORK_ERROR -> "Network error during sign-in"
                     com.google.android.gms.common.api.CommonStatusCodes.SIGN_IN_REQUIRED -> "Sign-in required"
+                    10 -> "Google setup error: release SHA-1 or Web Client ID is not registered"
                     else -> "Google Sign-In error (code ${e.statusCode})"
                 }
-                Log.e(TAG, "Sign-in failed: $errorMsg", e)
+                lastErrorMessage = errorMsg
+                AppLogger.e(TAG, "Sign-in failed: $errorMsg", e)
                 null
             } catch (e: Exception) {
-                Log.e(TAG, "Unexpected error during sign-in", e)
+                lastErrorMessage = "Google Sign-In error: ${e.localizedMessage ?: "unknown error"}"
+                AppLogger.e(TAG, "Unexpected error during sign-in", e)
                 null
             }
         }
     }
 
     /**
-     * Verify ID token with backend
-     * 
-     * @param idToken The ID token from Google
-     * @return AuthResult with token and onboarded status, or null if failed
+     * Verify ID token with backend (with fallback URL and detailed error diagnosis)
      */
     private suspend fun verifyWithBackend(idToken: String): AuthResult? {
-        return try {
-            val client = OkHttpClient.Builder()
-                .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .build()
+        val urls = listOf(BACKEND_URL, FALLBACK_URL)
+        val client = OkHttpClient.Builder()
+            .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .build()
 
-            val json = JSONObject()
-            json.put("idToken", idToken)
+        val json = JSONObject().apply { put("idToken", idToken) }
+        val body = json.toString().toRequestBody("application/json".toMediaType())
 
-            val body = json.toString().toRequestBody("application/json".toMediaType())
+        for (url in urls) {
+            try {
+                val request = Request.Builder().url(url).post(body).build()
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string()
 
-            val request = Request.Builder()
-                .url(BACKEND_URL)
-                .post(body)
-                .build()
+                if (response.isSuccessful && !responseBody.isNullOrBlank()) {
+                    val jsonResponse = JSONObject(responseBody)
 
-            val response = client.newCall(request).execute()
-            val responseBody = response.body?.string()
+                    if (jsonResponse.optBoolean("success", false)) {
+                        val token = jsonResponse.optString("token", "")
+                        if (token.isEmpty()) {
+                            AppLogger.e(TAG, "Backend returned success without an auth token")
+                            continue
+                        }
 
-            if (response.isSuccessful && responseBody != null) {
-                val jsonResponse = JSONObject(responseBody)
-                
-                // Use robust optBoolean instead of getBoolean to prevent crash if missing
-                if (jsonResponse.optBoolean("success", false)) {
-                    val token = jsonResponse.optString("token", "")
-                    if (token.isEmpty()) {
-                        Log.e(TAG, "Backend returned success but token is empty!")
-                        return null
+                        val sessionToken = jsonResponse.optString("sessionToken", "")
+                        val onboarded = jsonResponse.optBoolean("onboarded", false)
+                        val expiresAt = jsonResponse.optLong("expiresAt", 0L).let { raw ->
+                            if (raw > 0L) raw else System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)
+                        }
+
+                        val userObj = jsonResponse.optJSONObject("user")
+                        val name = userObj?.optString("name") ?: ""
+                        val email = userObj?.optString("email") ?: ""
+
+                        AppLogger.d(TAG, "Backend verification successful via $url")
+                        return AuthResult(token, sessionToken, onboarded, expiresAt, name, email)
+                    } else {
+                        val errMsg = jsonResponse.optString("error", "Verification rejected by server")
+                        lastErrorMessage = errMsg
+                        AppLogger.w(TAG, "Backend verification returned false: $errMsg")
                     }
-                    
-                    val sessionToken = jsonResponse.optString("sessionToken", "")
-                    
-                    // Supabase migration resilience: check both "onboarded" and "isNewUser"
-                    val onboarded = jsonResponse.optBoolean("onboarded", false) || jsonResponse.optBoolean("isNewUser", false)
-                    
-                    // expiresAt from backend (Unix millis). Fallback: 30 days from now.
-                    val expiresAt = jsonResponse.optLong("expiresAt", 0L).let { raw ->
-                        if (raw > 0L) raw else System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)
-                    }
-                    
-                    Log.d(TAG, "Backend verification successful")
-                    AuthResult(token, sessionToken, onboarded, expiresAt)
                 } else {
-                    val error = jsonResponse.optString("error", "Unknown error")
-                    Log.e(TAG, "Backend verification failed: $error")
-                    null
+                    val errorDetail = try {
+                        JSONObject(responseBody ?: "").optString("error", "Server returned HTTP ${response.code}")
+                    } catch (_: Exception) {
+                        "Server returned HTTP ${response.code}"
+                    }
+                    lastErrorMessage = errorDetail
+                    AppLogger.w(TAG, "Backend HTTP failed ($url): ${response.code} $errorDetail")
                 }
-            } else {
-                Log.e(TAG, "Backend HTTP failed: ${response.code} body: $responseBody")
-                null
+            } catch (e: Exception) {
+                lastErrorMessage = "Network error: ${e.localizedMessage ?: "timeout"}"
+                AppLogger.e(TAG, "Backend request error ($url)", e)
             }
-
-        } catch (e: Exception) {
-            Log.e(TAG, "Backend verification error", e)
-            null
         }
+        return null
     }
 
     /**
@@ -176,6 +208,8 @@ class GoogleSignInHelper(private val activity: Activity) {
         val token: String,
         val sessionToken: String,
         val onboarded: Boolean,
-        val expiresAt: Long = 0L  // Unix ms when JWT expires; 0 = unknown
+        val expiresAt: Long = 0L,  // Unix ms when JWT expires; 0 = unknown
+        val name: String = "",
+        val email: String = ""
     )
 }

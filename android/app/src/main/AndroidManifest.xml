@@ -1,12 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- 📱 Digital Wellbeing: read DND interruption filter to detect Bedtime / Focus Mode -->
+    <!-- Normal (install-time) permission — no runtime user prompt required             -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
     <!-- 🖼️ CRITICAL: Required to call WallpaperManager.setBitmap() — without this the app crashes -->
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
@@ -14,22 +14,27 @@
     <!-- 🔄 Required for BootReceiver to fire after device reboot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- 🤖 OEM Autostart Permissions (Xiaomi MIUI, Huawei EMUI, OnePlus, Oppo, Vivo) -->
+    <uses-permission android:name="miui.permission.ACCESS_MIUI_AUDIT" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="oppo.permission.OPPO_COMPONENT_SAFE" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="com.huawei.action.HUAWEI_ADJUST_POWER" tools:ignore="ProtectedPermissions" />
+
     <!-- 📁 File download to Downloads folder -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
-    <!-- 🔋 Battery Optimization Exemption — required for reliable background wallpaper updates -->
-    <!-- Without this, Battery Saver / Doze mode kills the WallpaperWorker -->
-    <!-- <uses-permission android:name="android.permission.IGNORE_BATTERY_OPTIMIZATIONS" /> -->
+    <!-- 🔋 Battery Optimization Exemption -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <!-- Background & Foreground Service Permissions -->
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- 🔄 Required for WorkManager to promote WallpaperWorker to a Foreground Service -->
+    <!-- 🎯 Reel Control overlay permission — DISABLED FOR INITIAL RELEASE -->
+    <!-- <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" /> -->
+
+    <!-- 🔄 Required for WallpaperWorker.setForeground() to run as a Foreground Service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- Android 14+ requires specifying the foreground service type -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
 
     <application
@@ -38,6 +43,9 @@
         android:icon="@drawable/app_logo"
         android:roundIcon="@drawable/app_logo"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/AppTheme"
         android:hardwareAccelerated="true"
         android:largeHeap="true"
@@ -56,6 +64,20 @@
             </intent-filter>
         </receiver>
 
+        <!--
+            📅 DateChangeReceiver — Triggers wallpaper update when the phone's date rolls over.
+            NOTE: Protected broadcasts MUST be declared statically in the manifest.
+        -->
+        <receiver
+            android:name=".workers.DateChangeReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+            </intent-filter>
+        </receiver>
+
         <!-- 🔔 Re-schedules alarm when user grants SCHEDULE_EXACT_ALARM permission from system settings -->
         <receiver
             android:name=".workers.AlarmPermissionReceiver"
@@ -69,7 +91,7 @@
         <receiver
             android:name=".workers.MidnightReceiver"
             android:enabled="true"
-            android:exported="true" />
+            android:exported="false" />
 
         <!-- 🔄 Required for WallpaperWorker.setForeground() to run as a Foreground Service -->
         <!-- Without this, WorkManager silently skips the foreground promotion on Android 12+ -->
@@ -81,7 +103,7 @@
         <!-- 📡 Firebase Cloud Messaging Service for Real-time Wallpaper Updates -->
         <service
             android:name=".workers.WallpaperMessagingService"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
@@ -116,12 +138,11 @@
                     android:host="payment-success" />
             </intent-filter>
 
-            <!-- 🔗 Android App Links (Verified HTTPS) -->
+            <!-- 🔗 Android App Links (HTTPS) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-
                 <data android:scheme="https" android:host="consistencygrid.com" android:path="/mobile-auth-callback" />
             </intent-filter>
 
@@ -137,6 +158,92 @@
             android:name=".auth.EmailAuthActivity"
             android:exported="false"
             android:theme="@style/AppTheme" />
+
+        <!-- 🏠 Main Compose Native App Shell — CRITICAL: must be declared or R8 obfuscation causes crash -->
+        <activity
+            android:name=".ui.compose.NativeAppActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme" />
+
+        <!-- 📅 Widgets -->
+        <receiver android:name=".widget.YearGridWidgetProvider" android:label="@string/widget_year_title" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.consistencygridwallpaper.ACTION_WIDGET_DATA_CHANGED" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_year_info" />
+        </receiver>
+
+        <receiver android:name=".widget.MonthGridWidgetProvider" android:label="@string/widget_month_title" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.consistencygridwallpaper.ACTION_WIDGET_DATA_CHANGED" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_month_info" />
+        </receiver>
+
+        <receiver android:name=".widget.LifeGridWidgetProvider" android:label="@string/widget_life_title" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.consistencygridwallpaper.ACTION_WIDGET_DATA_CHANGED" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_life_info" />
+        </receiver>
+
+        <receiver android:name=".widget.StatsWidgetProvider" android:label="@string/widget_stats_title" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.consistencygridwallpaper.ACTION_WIDGET_DATA_CHANGED" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_stats_info" />
+        </receiver>
+
+        <receiver android:name=".widget.WeekAgendaWidgetProvider" android:label="@string/widget_week_agenda_title" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.consistencygridwallpaper.ACTION_WIDGET_DATA_CHANGED" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_week_agenda_info" />
+        </receiver>
+
+        <receiver android:name=".widget.HabitWidgetProvider" android:label="@string/widget_habit_title" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.consistencygridwallpaper.ACTION_HABIT_WIDGET_DATA_CHANGED" />
+                <action android:name="com.consistencygridwallpaper.ACTION_WIDGET_DATA_CHANGED" />
+                <action android:name="com.consistencygridwallpaper.ACTION_TOGGLE_HABIT" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_habit_info" />
+        </receiver>
+        <service android:name=".widget.HabitWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
+        <receiver android:name=".widget.GoalWidgetProvider" android:label="@string/widget_goal_title" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.consistencygridwallpaper.ACTION_GOAL_WIDGET_DATA_CHANGED" />
+                <action android:name="com.consistencygridwallpaper.ACTION_WIDGET_DATA_CHANGED" />
+                <action android:name="com.consistencygridwallpaper.ACTION_COMPLETE_GOAL" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_goal_info" />
+        </receiver>
+        <service android:name=".widget.GoalWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
+        <receiver android:name=".widget.ReminderWidgetProvider" android:label="@string/widget_reminder_title" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.consistencygridwallpaper.ACTION_REMINDER_WIDGET_DATA_CHANGED" />
+                <action android:name="com.consistencygridwallpaper.ACTION_WIDGET_DATA_CHANGED" />
+                <action android:name="com.consistencygridwallpaper.ACTION_DISMISS_REMINDER" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_reminder_info" />
+        </receiver>
+        <service android:name=".widget.ReminderWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
 
     </application>
 </manifest>

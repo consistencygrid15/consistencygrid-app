@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="250dp"
+    android:height="110dp"
+    android:viewportWidth="250"
+    android:viewportHeight="110">
+    <path android:fillColor="#1C1C1E"
+        android:pathData="M8,0 L242,0 Q250,0 250,8 L250,102 Q250,110 242,110 L8,110 Q0,110 0,102 L0,8 Q0,0 8,0 Z"/>
+    <!-- Violet header -->
+    <path android:fillColor="#6B46C1"
+        android:pathData="M14,14 L110,14 Q112,14 112,16 L112,20 Q112,22 110,22 L14,22 Q12,22 12,20 L12,16 Q12,14 14,14 Z"/>
+    <path android:fillColor="#6B46C140"
+        android:pathData="M12,26 L238,26 L238,27 L12,27 Z"/>
+    <!-- Goal row 1 - violet bar + checkbox -->
+    <path android:fillColor="#6B46C1" android:pathData="M12,33 L15,33 L15,43 L12,43 Z"/>
+    <path android:strokeColor="#777777" android:strokeWidth="1.5"
+        android:pathData="M18,35 Q16,35 16,37 L16,41 Q16,43 18,43 L20,43 Q22,43 22,41 L22,37 Q22,35 20,35 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M25,37 L120,37 Q121,37 121,38.5 Q121,40 120,40 L25,40 Q24,40 24,38.5 Q24,37 25,37 Z"/>
+    <path android:fillColor="#6B46C1" android:pathData="M25,41 L80,41 Q81,41 81,42 Q81,43 80,43 L25,43 Q24,43 24,42 Q24,41 25,41 Z"/>
+    <!-- Progress bar -->
+    <path android:fillColor="#333333" android:pathData="M25,44 L220,44 Q221,44 221,45.5 Q221,47 220,47 L25,47 Q24,47 24,45.5 Q24,44 25,44 Z"/>
+    <path android:fillColor="#6B46C1" android:pathData="M25,44 L130,44 Q131,44 131,45.5 Q131,47 130,47 L25,47 Q24,47 24,45.5 Q24,44 25,44 Z"/>
+    <!-- Goal row 2 -->
+    <path android:fillColor="#6B46C1" android:pathData="M12,53 L15,53 L15,63 L12,63 Z"/>
+    <path android:strokeColor="#777777" android:strokeWidth="1.5"
+        android:pathData="M18,55 Q16,55 16,57 L16,61 Q16,63 18,63 L20,63 Q22,63 22,61 L22,57 Q22,55 20,55 Z"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M25,57 L95,57 Q96,57 96,58.5 Q96,60 95,60 L25,60 Q24,60 24,58.5 Q24,57 25,57 Z"/>
+    <path android:fillColor="#6B46C1" android:pathData="M25,61 L60,61 Q61,61 61,62 Q61,63 60,63 L25,63 Q24,63 24,62 Q24,61 25,61 Z"/>
+    <path android:fillColor="#333333" android:pathData="M25,64 L220,64 Q221,64 221,65.5 Q221,67 220,67 L25,67 Q24,67 24,65.5 Q24,64 25,64 Z"/>
+    <path android:fillColor="#6B46C1" android:pathData="M25,64 L90,64 Q91,64 91,65.5 Q91,67 90,67 L25,67 Q24,67 24,65.5 Q24,64 25,64 Z"/>
+</vector>

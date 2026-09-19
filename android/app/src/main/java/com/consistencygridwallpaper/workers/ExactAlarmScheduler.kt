@@ -26,26 +26,11 @@ object ExactAlarmScheduler {
     fun scheduleNextMidnightAlarm(context: Context) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-        // ── Permission gate: Android 12+ requires SCHEDULE_EXACT_ALARM ──────────────
-        // If the user hasn't granted it (or it was revoked), we fall through to the
-        // PeriodicWorkRequest backup (Layer 2) instead of silently returning nothing.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (!alarmManager.canScheduleExactAlarms()) {
-                Log.w(TAG, "⚠️ Exact alarm permission not granted — activating Layer 2 (PeriodicWork) backup")
-                MidnightWorkScheduler.schedule(context)
-                return
-            }
-        }
-
         val userPrefs = UserPrefs(context)
         val updateHour   = userPrefs.getUpdateHour()   // default 0
         val updateMinute = userPrefs.getUpdateMinute() // default 0
 
-        // ── Jitter: reduced to 0–5 minutes (was 0–30 minutes) ────────────────────────
-        // The old 0–30 min jitter, combined with OEM delays of 10–15 min on Xiaomi/OPPO,
-        // could push the execution to 00:44 AM — well past the 00:30 window.
-        // Spread across users is now handled server-side (FCM timestamps staggered by user ID).
-        // A small ≤5-min device-side jitter still prevents a perfect 100K hammer at 00:00.
+        // Small jitter 0..5 minutes
         val jitterMs = Random.nextLong(0L, 5L * 60L * 1000L) // 0 to 300_000 ms (5 minutes)
 
         val calendar = Calendar.getInstance().apply {
@@ -78,16 +63,37 @@ object ExactAlarmScheduler {
         )
 
         try {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                targetTimeMs,
-                pendingIntent
-            )
-            Log.d(TAG, "✅ setExactAndAllowWhileIdle registered — Layer 1 active")
-        } catch (e: SecurityException) {
-            Log.e(TAG, "SecurityException scheduling exact alarm — activating Layer 2 backup", e)
-            MidnightWorkScheduler.schedule(context)
+            val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+            if (canExact) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    targetTimeMs,
+                    pendingIntent
+                )
+                Log.d(TAG, "✅ setExactAndAllowWhileIdle registered — Layer 1 (Exact Alarm) active")
+            } else {
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    targetTimeMs,
+                    pendingIntent
+                )
+                Log.d(TAG, "✅ setAndAllowWhileIdle registered — Layer 1 (Doze-Bypassing Alarm) active")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "AlarmManager registration error — attempting setAndAllowWhileIdle fallback", e)
+            try {
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    targetTimeMs,
+                    pendingIntent
+                )
+            } catch (e2: Exception) {
+                Log.e(TAG, "Fallback alarm registration failed", e2)
+            }
         }
+
+        // Always schedule Layer 2 PeriodicWork backup as well
+        MidnightWorkScheduler.schedule(context)
     }
 
     /**

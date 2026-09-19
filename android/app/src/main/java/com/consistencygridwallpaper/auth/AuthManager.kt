@@ -1,7 +1,7 @@
 package com.consistencygridwallpaper.auth
 
 import android.content.Context
-import android.util.Log
+import com.consistencygridwallpaper.utils.AppLogger
 import com.consistencygridwallpaper.storage.UserPrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -46,7 +46,7 @@ class AuthManager private constructor(private val context: Context) {
     fun isLoggedIn(): Boolean {
         val token = userPrefs.getToken()
         val isLoggedIn = !token.isNullOrBlank()
-        Log.d(TAG, "isLoggedIn: $isLoggedIn")
+        AppLogger.d(TAG, "isLoggedIn: $isLoggedIn")
         return isLoggedIn
     }
 
@@ -79,7 +79,7 @@ class AuthManager private constructor(private val context: Context) {
         onboarded: Boolean,
         expiresAt: Long = 0L
     ) {
-        Log.d(TAG, "saveAuthData: token present=${token.isNotBlank()}, onboarded=$onboarded")
+        AppLogger.d(TAG, "saveAuthData: token present=${token.isNotBlank()}, onboarded=$onboarded")
         userPrefs.saveToken(token)
         if (sessionToken.isNotEmpty()) {
             userPrefs.saveSessionToken(sessionToken)
@@ -105,7 +105,7 @@ class AuthManager private constructor(private val context: Context) {
     suspend fun refreshSessionToken(): Boolean = withContext(Dispatchers.IO) {
         val publicToken = userPrefs.getToken()
         if (publicToken.isNullOrBlank()) {
-            Log.w(TAG, "refreshSessionToken: No publicToken stored, cannot refresh")
+            AppLogger.w(TAG, "refreshSessionToken: No publicToken stored, cannot refresh")
             return@withContext false
         }
 
@@ -138,15 +138,15 @@ class AuthManager private constructor(private val context: Context) {
                     else System.currentTimeMillis() + (30L * 24 * 60 * 60 * 1000)
                     userPrefs.saveTokenExpiry(expiry)
 
-                    Log.d(TAG, "refreshSessionToken: ✅ Token refreshed successfully")
+                    AppLogger.d(TAG, "refreshSessionToken: ✅ Token refreshed successfully")
                     return@withContext true
                 }
-                Log.w(TAG, "refreshSessionToken: Backend returned success=false: $responseBody")
+                AppLogger.w(TAG, "refreshSessionToken: Backend returned success=false")
             } else {
-                Log.w(TAG, "refreshSessionToken: HTTP ${response.code} — $responseBody")
+                AppLogger.w(TAG, "refreshSessionToken: HTTP ${response.code}")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "refreshSessionToken: Network error", e)
+            AppLogger.e(TAG, "refreshSessionToken: Network error", e)
         }
         false
     }
@@ -158,8 +158,9 @@ class AuthManager private constructor(private val context: Context) {
      * Clears all stored data and signs out of the native Google session.
      */
     fun logout() {
-        Log.d(TAG, "logout: Clearing all user data")
+        AppLogger.d(TAG, "logout: Clearing all user data")
         userPrefs.clear()
+        userPrefs.saveOnboardedStatus(true)
 
         try {
             val gso = com.google.android.gms.auth.api.signin.GoogleSignInOptions.Builder(
@@ -168,9 +169,9 @@ class AuthManager private constructor(private val context: Context) {
             val googleSignInClient =
                 com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(context, gso)
             googleSignInClient.signOut()
-            Log.d(TAG, "logout: Google Sign-In session cleared")
+            AppLogger.d(TAG, "logout: Google Sign-In session cleared")
         } catch (e: Exception) {
-            Log.e(TAG, "logout: Failed to clear Google Sign-In session", e)
+            AppLogger.e(TAG, "logout: Failed to clear Google Sign-In session", e)
         }
     }
 }

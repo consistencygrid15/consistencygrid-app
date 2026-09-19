@@ -77,6 +77,9 @@ interface HabitLogDao {
 
     @Query("UPDATE habit_logs SET is_synced = 1 WHERE id IN (:ids)")
     suspend fun markLogsSynced(ids: List<String>)
+
+    @Query("UPDATE habit_logs SET habit_id = :newHabitId, id = :newHabitId || '_' || date WHERE habit_id = :oldHabitId")
+    suspend fun updateHabitIdForLogs(oldHabitId: String, newHabitId: String)
     
     @Query("DELETE FROM habit_logs")
     suspend fun clearAll()

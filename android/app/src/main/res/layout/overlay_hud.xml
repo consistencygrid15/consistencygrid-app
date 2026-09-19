@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Premium floating HUD: Horizontal line, no background, top center -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingHorizontal="20dp"
+    android:paddingVertical="10dp"
+    android:background="@drawable/bg_hud_pill">
+
+<!-- Drag Handle Icon -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="⋮⋮ "
+        android:textColor="#80FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <!-- Reel count: large orange number -->
+    <TextView
+        android:id="@+id/tv_reel_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0"
+        android:textColor="#F97316"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-condensed"
+        android:shadowColor="#99000000"
+        android:shadowDx="0"
+        android:shadowDy="2"
+        android:shadowRadius="6" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=" REELS"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:shadowColor="#99000000"
+        android:shadowDx="0"
+        android:shadowDy="2"
+        android:shadowRadius="6" />
+
+    <Space android:layout_width="16dp" android:layout_height="1dp" />
+
+    <!-- Limit progress bar -->
+    <ProgressBar
+        android:id="@+id/pb_limit_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="60dp"
+        android:layout_height="4dp"
+        android:minHeight="0dp"
+        android:maxHeight="4dp"
+        android:max="100"
+        android:progress="0"
+        android:progressTint="#F97316"
+        android:progressBackgroundTint="#40FFFFFF" />
+
+    <Space android:layout_width="16dp" android:layout_height="1dp" />
+
+    <!-- Watch time -->
+    <TextView
+        android:id="@+id/tv_watch_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0:00"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
+        android:shadowColor="#99000000"
+        android:shadowDx="0"
+        android:shadowDy="2"
+        android:shadowRadius="6" />
+
+</LinearLayout>

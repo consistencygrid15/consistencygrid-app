@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/item_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingVertical="8dp"
+    android:paddingHorizontal="2dp"
+    android:descendantFocusability="blocksDescendants">
+
+    <FrameLayout
+        android:id="@+id/item_indicator"
+        android:layout_width="3dp"
+        android:layout_height="28dp"
+        android:background="#6B46C1"
+        android:layout_marginEnd="8dp" />
+
+    <ImageView
+        android:id="@+id/item_checkbox"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:src="@drawable/ic_checkbox_unchecked"
+        android:layout_marginEnd="10dp"
+        android:contentDescription="Mark goal complete" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/item_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/item_subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#999999"
+            android:textSize="10sp"
+            android:maxLines="1" />
+    </LinearLayout>
+
+</LinearLayout>
