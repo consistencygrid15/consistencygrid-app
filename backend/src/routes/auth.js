@@ -134,7 +134,18 @@ router.post("/native-auth/email-login", async (req, res) => {
 // ─── POST /api/auth/native/google ────────────────────────────────────────────────
 router.post("/auth/native/google", async (req, res) => {
     try {
-        const { email, name, idToken } = req.body;
+        let { email, name, idToken } = req.body;
+
+        // Fallback: decode email from idToken JWT if not sent directly
+        if (!email && idToken) {
+            try {
+                const decoded = jwt.decode(idToken);
+                if (decoded && decoded.email) {
+                    email = decoded.email;
+                    name = name || decoded.name;
+                }
+            } catch (e) {}
+        }
 
         if (!email) {
             return res.status(400).json({ success: false, error: "Email is required" });

@@ -93,7 +93,7 @@ class GoogleSignInHelper(private val activity: Activity) {
 
                 // Authentication is server-authoritative. Never create a local token when
                 // backend verification fails because that token cannot authorize API calls.
-                val backendResult = verifyWithBackend(idToken)
+                val backendResult = verifyWithBackend(idToken, googleEmail, googleName)
                 if (backendResult == null) {
                     if (lastErrorMessage.isNullOrBlank()) {
                         lastErrorMessage = "Could not verify your Google account. Check your connection and try again."
@@ -133,15 +133,23 @@ class GoogleSignInHelper(private val activity: Activity) {
     /**
      * Verify ID token with backend (with fallback URL and detailed error diagnosis)
      */
-    private suspend fun verifyWithBackend(idToken: String): AuthResult? {
-        val urls = listOf(BACKEND_URL, FALLBACK_URL)
+    private suspend fun verifyWithBackend(idToken: String, email: String? = null, name: String? = null): AuthResult? {
+        val baseUrl = com.consistencygridwallpaper.storage.UserPrefs(activity).getBaseUrl().trimEnd('/')
+        val urls = listOf(
+            "$baseUrl/api/auth/native/google",
+            "$baseUrl/api/native-auth/google"
+        )
         val client = OkHttpClient.Builder()
             .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .readTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .build()
 
-        val json = JSONObject().apply { put("idToken", idToken) }
+        val json = JSONObject().apply {
+            put("idToken", idToken)
+            if (!email.isNullOrBlank()) put("email", email)
+            if (!name.isNullOrBlank()) put("name", name)
+        }
         val body = json.toString().toRequestBody("application/json".toMediaType())
 
         for (url in urls) {
