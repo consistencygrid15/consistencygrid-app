@@ -58,7 +58,7 @@ class UserPrefs(context: Context) {
         
         // Defaults
         private const val DEFAULT_THEME_COLOR = "#FF7A00" // Orange
-        private const val DEFAULT_BASE_URL = "https://consistencygrid.com"
+        private const val DEFAULT_BASE_URL = "https://consistencygrid-app.onrender.com"
         private const val DEFAULT_TARGET = "BOTH"
     }
 

@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
  */
 object ApiClient {
     private const val TAG = "ApiClient"
-    private const val DEFAULT_BASE_URL = "https://consistencygrid.com/"
+    private const val DEFAULT_BASE_URL = "https://consistencygrid-app.onrender.com/"
 
     private var retrofit: Retrofit? = null
     private var lastBaseUrl: String = ""
