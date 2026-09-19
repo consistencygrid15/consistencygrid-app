@@ -393,9 +393,9 @@ private fun PlansSection(
         PlanCard(
             productId    = BillingManager.PRODUCT_YEARLY,
             title        = "Yearly",
-            price        = getPrice(BillingManager.PRODUCT_YEARLY) ?: "₹499/year",
-            perMonth     = "Just ₹41/month",
-            badge        = "BEST VALUE · SAVE 15%",
+            price        = getPrice(BillingManager.PRODUCT_YEARLY) ?: "₹399/year",
+            perMonth     = "Just ₹33/month",
+            badge        = "BEST VALUE · SAVE 32%",
             isSelected   = selectedPlan == BillingManager.PRODUCT_YEARLY,
             isRecommended = true,
             onClick      = { onSelectPlan(BillingManager.PRODUCT_YEARLY) }
